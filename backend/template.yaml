@@ -1,0 +1,257 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Stock Radio - Backend Infrastructure
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+  GroqApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+  AnthropicApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+  OpenAiApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+  LlmProvider:
+    Type: String
+    Default: groq
+    AllowedValues: [groq, gemini, claude, openai]
+  TtsEngine:
+    Type: String
+    Default: standard
+    AllowedValues: [standard, neural]
+  JQuantsApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+  AlphaVantageApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        ENV: !Ref Env
+        AUDIO_BUCKET: !Ref AudioBucket
+        USERS_TABLE: !Ref UsersTable
+        WATCHLISTS_TABLE: !Ref WatchlistsTable
+        RADIOS_TABLE: !Ref RadiosTable
+        LLM_PROVIDER: !Ref LlmProvider
+        TTS_ENGINE: !Ref TtsEngine
+        GEMINI_API_KEY: !Ref GeminiApiKey
+        GROQ_API_KEY: !Ref GroqApiKey
+        ANTHROPIC_API_KEY: !Ref AnthropicApiKey
+        OPENAI_API_KEY: !Ref OpenAiApiKey
+        JQUANTS_API_KEY: !Ref JQuantsApiKey
+        ALPHA_VANTAGE_API_KEY: !Ref AlphaVantageApiKey
+        FIREBASE_CREDENTIALS_PARAM: !Sub "/stock-radio/${Env}/firebase-credentials"
+
+Resources:
+
+  AudioBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "stock-radio-audio-${Env}-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteFreeAudio
+            Status: Enabled
+            ExpirationInDays: 3
+            TagFilters:
+              - Key: plan
+                Value: free
+          - Id: DeleteStandardAudio
+            Status: Enabled
+            ExpirationInDays: 32
+            TagFilters:
+              - Key: plan
+                Value: standard
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "stock-radio-users-${Env}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+
+  WatchlistsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "stock-radio-watchlists-${Env}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: stockCode
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: stockCode
+          KeyType: RANGE
+
+  RadiosTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "stock-radio-radios-${Env}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: radioDate
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: radioDate
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  RadioGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "stock-radio-generator-${Env}"
+      CodeUri: lambda/radio_generator/
+      Handler: handler.lambda_handler
+      Timeout: 900
+      MemorySize: 2048
+      Policies:
+        - S3FullAccessPolicy:
+            BucketName: !Ref AudioBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WatchlistsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RadiosTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - polly:SynthesizeSpeech
+                - polly:DescribeVoices
+              Resource: "*"
+      Events:
+        RadioGenerationSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: "cron(30 20 * * ? *)"
+            Name: !Sub "stock-radio-generate-${Env}"
+            Description: "Daily radio generation at 5:30 AM JST"
+
+  ApiHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "stock-radio-api-${Env}"
+      CodeUri: lambda/api_handler/
+      Handler: handler.lambda_handler
+      Timeout: 30
+      MemorySize: 512
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WatchlistsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RadiosTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub "arn:aws:s3:::${AudioBucket}/*"
+      Events:
+        ApiProxy:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+        ApiRoot:
+          Type: Api
+          Properties:
+            Path: /
+            Method: ANY
+
+  NotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "stock-radio-notification-${Env}"
+      CodeUri: lambda/notification/
+      Handler: handler.lambda_handler
+      Timeout: 300
+      MemorySize: 512
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref RadiosTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/stock-radio/${Env}/firebase-credentials"
+      Events:
+        NotificationSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: "cron(0 22 * * ? *)"
+            Name: !Sub "stock-radio-notify-${Env}"
+            Description: "Push notification at 7:00 AM JST"
+
+  CleanupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "stock-radio-cleanup-${Env}"
+      CodeUri: lambda/cleanup/
+      Handler: handler.lambda_handler
+      Timeout: 300
+      MemorySize: 512
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RadiosTable
+        - S3FullAccessPolicy:
+            BucketName: !Ref AudioBucket
+      Events:
+        CleanupSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: "cron(0 21 * * ? *)"
+            Name: !Sub "stock-radio-cleanup-${Env}"
+            Description: "Cleanup expired files at 6:00 AM JST"
+
+Outputs:
+  ApiGatewayUrl:
+    Description: "API endpoint URL - set this in iOS APIService.swift"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+  AudioBucketName:
+    Value: !Ref AudioBucket
+  UsersTableName:
+    Value: !Ref UsersTable
+  RadioGeneratorArn:
+    Value: !GetAtt RadioGeneratorFunction.Arn

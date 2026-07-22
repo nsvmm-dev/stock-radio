@@ -1,0 +1,46 @@
+version = 0.1
+
+[default.global.parameters]
+stack_name = "stock-radio-dev"
+region = "ap-northeast-1"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+region = "ap-northeast-1"
+s3_prefix = "stock-radio-dev"
+image_repositories = []
+
+[dev.deploy.parameters]
+stack_name = "stock-radio-dev"
+region = "ap-northeast-1"
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
+s3_prefix = "stock-radio-dev"
+confirm_changeset = true
+parameter_overrides = [
+  "Env=dev",
+  "LlmProvider=groq",
+  "TtsEngine=standard",
+  "GeminiApiKey=skip",
+  "AnthropicApiKey=skip",
+  "OpenAiApiKey=skip"
+]
+
+[prod.deploy.parameters]
+stack_name = "stock-radio-prod"
+region = "ap-northeast-1"
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
+s3_prefix = "stock-radio-prod"
+confirm_changeset = true
+parameter_overrides = [
+  "Env=prod",
+  "LlmProvider=claude",
+  "TtsEngine=neural"
+]

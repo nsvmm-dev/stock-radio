@@ -1,0 +1,10 @@
+boto3>=1.34.0
+feedparser>=6.0.11
+requests>=2.31.0
+groq>=0.9.0
+# For production with Claude (uncomment before prod deploy):
+# anthropic>=0.29.0
+# For production with OpenAI (uncomment before prod deploy):
+# openai>=1.35.0
+# Gemini (requires billing):
+# google-generativeai>=0.7.0

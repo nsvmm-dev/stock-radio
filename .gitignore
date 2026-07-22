@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+.aws-sam/
+
+# 環境変数・秘密鍵
+.env
+*.env.local
+config/secrets.json
+firebase-credentials.json
+
+# AWS SAM ビルド成果物
+.aws-sam/
+
+# macOS
+.DS_Store
+
+# Xcode
+ios/StockRadio/*.xcworkspace/xcuserdata/
+ios/StockRadio/DerivedData/
+ios/StockRadio/*.xcodeproj/xcuserdata/
+
+# IDE
+.vscode/
+.idea/
+*.swp
