@@ -315,54 +315,82 @@ sam deploy   # --guided なしでOK（samconfig.toml を自動読込）
 
 ---
 
-## Step 5: iOS開発・テスト（Mac で実施）
+## Step 4-6. Git コミット・GitHub へプッシュ（Windows）
 
-> ここからは Mac に切り替えて作業します。
-> AWS デプロイは Windows で済んでいるため、Mac では Xcode のみ使います。
+### 初回（リポジトリ作成済みの場合はスキップ）
 
----
-
-### Mac で必要なもの（インストールリスト）
-
-| ツール | 入手先 | 所要時間 |
-|--------|--------|----------|
-| **Xcode** | App Store → 「Xcode」 | ダウンロード約7GB、30〜60分 |
-| Firebase SDK | Xcode 内 (Swift Package Manager) | 5分 |
-| AWS CLI / SAM CLI | **不要** | − |
-| Python | **不要** | − |
-| Homebrew | **不要** | − |
-
----
-
-### 5-0. プロジェクトを Mac に持っていく
-
-**方法A: USB / 外付けSSD（シンプル）**
-```
-c:\02_App\Stock_radio\ フォルダをまるごとコピー
-→ Mac の ~/Documents/Stock_radio/ に貼り付け
-```
-
-**方法B: GitHub 経由（推奨・.gitignore で秘密情報は除外済み）**
 ```powershell
-# Windows 側で実行
 cd c:\02_App\Stock_radio
-git init
+
+# ブランチ名を main に統一
+git branch -m master main
+
+# 全ファイルをステージング（.gitignore で秘密情報は除外済み）
 git add .
-git commit -m "initial"
-git remote add origin https://github.com/yourname/stock-radio.git
+git commit -m "initial commit"
+
+# GitHub にプッシュ（初回は -u でトラッキング設定）
 git push -u origin main
 ```
-```bash
-# Mac 側で実行
-git clone https://github.com/yourname/stock-radio.git ~/Documents/Stock_radio
+
+### 2回目以降（コードを変更したとき）
+
+```powershell
+cd c:\02_App\Stock_radio
+
+git add .
+git commit -m "変更内容を一言で（例: fix radio date bug）"
+git push origin main
 ```
+
+> **Mac 側は** `git pull` するだけで最新コードを取得できます（詳細は Step 5-9）。
+
+### よく使うコマンド
+
+| コマンド | 用途 |
+|---|---|
+| `git status` | 変更されたファイルを確認 |
+| `git diff` | 変更内容を確認 |
+| `git log --oneline` | コミット履歴を確認 |
+| `git pull origin main` | GitHub から最新を取得 |
+
+---
+
+## Step 5: iOS開発・テスト（Mac で実施）
+
+> コード改修は Mac の VSCode（Claude 入り）、ビルド・テストは Xcode で行います。
+> AWS バックエンドは Windows で管理済みのため、Mac 側では追加のサーバー設定は不要です。
+
+---
+
+### Mac で必要なもの
+
+| ツール | 入手先 | 用途 |
+|--------|--------|------|
+| **Xcode** | App Store → 「Xcode」（約7GB） | ビルド・Simulator テスト・App Store 申請 |
+| **VSCode** | 既にインストール済み | Swift コード改修・Claude で補助 |
+| Firebase SDK | Xcode 内 (Swift Package Manager) | プッシュ通知 |
+| AWS CLI / SAM CLI | **不要** | バックエンドは Windows で管理 |
+| Python / Homebrew | **不要** | − |
+
+---
+
+### 5-0. プロジェクトを Mac に持っていく（GitHub 経由）
+
+Mac のターミナルで実行：
+
+```bash
+git clone https://github.com/nsvmm-dev/stock-radio.git ~/Documents/Stock_radio
+```
+
+> ⚠️ `.gitignore` により API キー・認証情報はリポジトリに含まれません。
+> API キーは AWS Lambda の環境変数に設定済みのため、Mac 側での追加設定は不要です。
 
 ---
 
 ### 5-1. Xcode インストール
 
-1. Mac の **App Store** を開く → 「Xcode」で検索 → インストール
-   - 約 7GB、Wi-Fi 接続で 30〜60 分かかります
+1. Mac の **App Store** を開く → 「Xcode」で検索 → インストール（約7GB、30〜60分）
 2. インストール後 Xcode を起動 → 追加コンポーネントのインストールが走る（10〜20 分）
 3. 完了確認：
    ```bash
@@ -374,9 +402,8 @@ git clone https://github.com/yourname/stock-radio.git ~/Documents/Stock_radio
 
 ### 5-2. Xcode プロジェクト作成
 
-1. Xcode → 「Create New Project」
-2. **iOS** → **App** → Next
-3. 以下を入力：
+1. Xcode → 「Create New Project」→ **iOS** → **App** → Next
+2. 以下を入力：
 
    | 項目 | 入力値 |
    |------|--------|
@@ -385,7 +412,8 @@ git clone https://github.com/yourname/stock-radio.git ~/Documents/Stock_radio
    | Interface | `SwiftUI` |
    | Language | `Swift` |
 
-4. 保存先: `~/Documents/Stock_radio/ios/StockRadio/` を選択
+3. 保存先: **`~/Documents/Stock_radio/ios/`** を選択（`StockRadio` フォルダの**一段上**）
+   - Xcode が `ios/StockRadio/` に `.xcodeproj` を作成し、既存の `Sources/` と同じ階層に並ぶ
 
 ---
 
@@ -400,21 +428,22 @@ git clone https://github.com/yourname/stock-radio.git ~/Documents/Stock_radio
 追加されるファイル：
 ```
 Sources/
-  App/StockRadioApp.swift       ← エントリポイント
+  App/StockRadioApp.swift         ← エントリポイント
   Models/Models.swift
-  Services/APIService.swift
+  Services/APIService.swift       ← ここに API URL を設定する
   Services/AudioPlayerService.swift
   Views/HomeView.swift
   Views/RadioPlayerView.swift
   Views/SearchView.swift
-  Views/MyPageView.swift        ← OnboardingView も含む
+  Views/MyPageView.swift          ← OnboardingView も含む
 ```
 
 ---
 
-### 5-4. API エンドポイントを設定
+### 5-4. API エンドポイントを設定（VSCode で編集）
 
-`Sources/Services/APIService.swift` の先頭を編集：
+VSCode で以下のファイルを開いて先頭行を編集：
+`~/Documents/Stock_radio/ios/StockRadio/Sources/Services/APIService.swift`
 
 ```swift
 // 変更前
@@ -424,9 +453,11 @@ private let baseURL = "https://YOUR_API_ID.execute-api.ap-northeast-1.amazonaws.
 private let baseURL = "https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.com/Prod"
 ```
 
+保存後、Xcode で **⌘B** を押すだけでリビルドできます。
+
 ---
 
-### 5-5. Firebase SDK を追加
+### 5-5. Firebase SDK を追加（Xcode で実施）
 
 1. Xcode メニュー → **File** → **Add Package Dependencies**
 2. 検索欄に貼り付け：
@@ -446,17 +477,17 @@ private let baseURL = "https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.c
 
 ### 5-6. GoogleService-Info.plist を追加（Firebase 設定済みの場合のみ）
 
-1. Firebase Console で取得した `GoogleService-Info.plist` を用意
-2. Xcode のプロジェクトルートにドラッグ
+1. Firebase Console で取得した `GoogleService-Info.plist` を Finder で用意
+2. Xcode のプロジェクトルート（`StockRadio.xcodeproj` と同じ階層）にドラッグ
 3. ダイアログ: 「**Copy items if needed**」にチェック → Finish
 
 ---
 
-### 5-7. Capabilities 設定
+### 5-7. Capabilities 設定（Xcode で実施）
 
 1. Xcode 左ツリーの一番上 `StockRadio`（青いアイコン）をクリック
 2. **Signing & Capabilities** タブ
-3. **Team**: Apple アカウントを選択（無料アカウントでもOK・Simulator実行なら不要）
+3. **Team**: Apple アカウントを選択（無料アカウントでもOK・Simulator 実行なら不要）
 4. 「**+ Capability**」をクリックして以下を追加：
    - `Background Modes` → 以下にチェック：
      - ✅ Audio, AirPlay, and Picture in Picture
@@ -466,7 +497,7 @@ private let baseURL = "https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.c
 
 ---
 
-### 5-8. ビルドして Simulator で確認
+### 5-8. ビルドして Simulator で確認（Xcode で実施）
 
 1. 左上のデバイス選択 → **iPhone 16** などを選択
 2. **⌘B** でビルド → エラーがないことを確認
@@ -480,6 +511,25 @@ private let baseURL = "https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.c
 | ウォッチリスト → 銘柄を追加 | リストに追加される |
 | Lambda を手動実行（AWS コンソール）後にリロード | ホームにラジオが表示される |
 | ラジオをタップ | 音声が再生される |
+
+---
+
+### 5-9. コード改修のワークフロー（日常作業）
+
+```
+【Windows / Mac どちらでも】
+VSCode で Swift コードを編集（Claude に相談しながら）
+    ↓
+git add . && git commit -m "変更内容"
+git push origin main
+    ↓
+【Mac】
+ターミナルで: git pull
+    ↓
+Xcode で ⌘B → ⌘R でビルド・確認
+```
+
+> Xcode を開き直す必要はありません。VSCode で保存 → Xcode で ⌘B だけでOKです。
 
 ---
 
