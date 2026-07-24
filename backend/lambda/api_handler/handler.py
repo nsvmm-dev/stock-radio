@@ -8,6 +8,8 @@ from decimal import Decimal
 import boto3
 from boto3.dynamodb.conditions import Key
 
+from news_fetcher import NewsFetcher
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -49,6 +51,17 @@ def _route(method, path, query_params, body):
     # GET /stocks/search?q=xxx
     if segments == ["stocks", "search"] and method == "GET":
         return _search_stocks(query_params.get("q", ""))
+
+    # GET /stocks/hot
+    if segments == ["stocks", "hot"] and method == "GET":
+        return _get_hot_stocks()
+
+    if len(segments) == 4 and segments[0] == "stocks" and method == "GET":
+        market, code, action = segments[1], segments[2], segments[3]
+        if action == "quote":
+            return _get_stock_quote(market, code)
+        if action == "news":
+            return _get_stock_news(market, code, query_params.get("name", ""))
 
     if len(segments) >= 2 and segments[0] == "users":
         user_id = segments[1]
@@ -208,6 +221,44 @@ def _search_stocks(query: str):
     # TODO: J-Quants の銘柄マスタを使った検索を実装
     # 現時点はスタブ実装
     return _res(200, {"results": [], "query": query})
+
+
+# ── 株価・注目銘柄・ニュース ───────────────────────────────────────────
+
+def _get_hot_stocks():
+    """当日の注目銘柄(米国値上がり/値下がり/出来高上位、日本の人気銘柄)"""
+    result = dynamodb.Table(os.environ["HOT_STOCKS_TABLE"]).scan()
+    by_category = {item["category"]: item.get("items", []) for item in result.get("Items", [])}
+
+    return _res(200, {
+        "usGainers": by_category.get("us_gainers", []),
+        "usLosers": by_category.get("us_losers", []),
+        "usMostActive": by_category.get("us_most_active", []),
+        "jpPopular": by_category.get("jp_popular", []),
+    })
+
+
+def _get_stock_quote(market: str, code: str):
+    """日次バッチでキャッシュされた株価・チャート履歴を取得"""
+    market_code = f"{market.upper()}#{code.upper()}"
+    result = dynamodb.Table(os.environ["STOCK_PRICES_TABLE"]).get_item(
+        Key={"marketCode": market_code}
+    )
+    if "Item" not in result:
+        return _res(404, {"error": "quote not found"})
+
+    item = result["Item"]
+    item["history"] = item.get("history", [])[-30:]  # 直近30件にトリム
+    return _res(200, item)
+
+
+def _get_stock_news(market: str, code: str, name: str):
+    """銘柄名/コードでニュースをライブ取得しフィルタ(RSSはレート制限なし)"""
+    all_news = NewsFetcher().get_all_news()
+    keywords = {kw for kw in (code, name) if kw}
+
+    matched = [n for n in all_news if any(kw in n.get("title", "") for kw in keywords)]
+    return _res(200, {"market": market, "code": code, "news": matched[:20]})
 
 
 # ── ヘルパー ─────────────────────────────────────────────────────────

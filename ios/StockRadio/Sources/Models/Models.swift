@@ -37,6 +37,63 @@ struct WatchlistItem: Codable, Identifiable {
     let addedAt: String?
 }
 
+// ── 株価ダッシュボード ──────────────────────────────────────────────
+
+/// タブをまたいで株価詳細画面へ遷移するための共通キー
+struct StockRef: Codable, Identifiable, Hashable {
+    let market: String  // "JP" or "US"
+    let code: String
+    let name: String
+    var id: String { "\(market)#\(code)" }
+}
+
+struct StockPricePoint: Codable, Identifiable, Hashable {
+    let date: String
+    let close: Double
+    var id: String { date }
+}
+
+struct StockQuote: Codable {
+    let market: String
+    let code: String
+    let name: String
+    let latestClose: Double
+    let changePct: Double
+    let updatedAt: String?
+    let history: [StockPricePoint]
+}
+
+struct HotStock: Codable, Identifiable {
+    let market: String
+    let code: String
+    let name: String
+    let latestClose: Double?
+    let changePct: Double?
+    var id: String { "\(market)#\(code)" }
+}
+
+struct HotStocksResponse: Codable {
+    let usGainers: [HotStock]
+    let usLosers: [HotStock]
+    let usMostActive: [HotStock]
+    let jpPopular: [HotStock]
+}
+
+struct NewsItem: Codable, Identifiable, Hashable {
+    let title: String
+    let summary: String
+    let link: String
+    let publishedAt: String
+    let source: String
+    let category: String
+    var id: String { link }
+
+    enum CodingKeys: String, CodingKey {
+        case title, summary, link, source, category
+        case publishedAt = "published_at"
+    }
+}
+
 // ── プラン ────────────────────────────────────────────────────────
 
 enum Plan: String, CaseIterable {

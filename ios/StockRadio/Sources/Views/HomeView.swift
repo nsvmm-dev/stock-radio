@@ -1,56 +1,41 @@
 import SwiftUI
 
-struct MainTabView: View {
-    var body: some View {
-        TabView {
-            HomeView()
-                .tabItem { Label("ホーム", systemImage: "radio") }
-            SearchView()
-                .tabItem { Label("検索", systemImage: "magnifyingglass") }
-            MyPageView()
-                .tabItem { Label("マイページ", systemImage: "person") }
-        }
-    }
-}
+// ── ラジオ履歴一覧(ホームの「すべて見る」から遷移) ──────────────────
 
-// ── ホーム ────────────────────────────────────────────────────────
-
-struct HomeView: View {
+struct RadioHistoryListView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = HomeViewModel()
 
     var body: some View {
-        NavigationStack {
-            List {
-                if vm.isLoading {
-                    ProgressView("読み込み中...")
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .listRowSeparator(.hidden)
-                } else if vm.radios.isEmpty {
-                    ContentUnavailableView(
-                        "ラジオがまだありません",
-                        systemImage: "radio",
-                        description: Text("毎朝7時に最新のラジオが届きます")
-                    )
-                } else {
-                    ForEach(vm.radios) { radio in
-                        NavigationLink(value: radio) {
-                            RadioRowView(radio: radio)
-                        }
+        List {
+            if vm.isLoading {
+                ProgressView("読み込み中...")
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .listRowSeparator(.hidden)
+            } else if vm.radios.isEmpty {
+                ContentUnavailableView(
+                    "ラジオがまだありません",
+                    systemImage: "radio",
+                    description: Text("毎朝7時に最新のラジオが届きます")
+                )
+            } else {
+                ForEach(vm.radios) { radio in
+                    NavigationLink(value: radio) {
+                        RadioRowView(radio: radio)
                     }
                 }
             }
-            .listStyle(.plain)
-            .navigationTitle("株価ラジオ")
-            .navigationDestination(for: RadioMeta.self) { radio in
-                RadioPlayerView(radio: radio)
-            }
-            .refreshable {
-                await vm.load(userId: appState.userId ?? "")
-            }
-            .task {
-                await vm.load(userId: appState.userId ?? "")
-            }
+        }
+        .listStyle(.plain)
+        .navigationTitle("ラジオ履歴")
+        .navigationDestination(for: RadioMeta.self) { radio in
+            RadioPlayerView(radio: radio)
+        }
+        .refreshable {
+            await vm.load(userId: appState.userId ?? "")
+        }
+        .task {
+            await vm.load(userId: appState.userId ?? "")
         }
     }
 }

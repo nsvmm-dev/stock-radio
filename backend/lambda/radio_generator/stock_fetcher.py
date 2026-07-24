@@ -153,6 +153,130 @@ class StockFetcher:
 
         return None
 
+    def get_us_stock_series(self, symbol: str, limit: int = 30) -> Optional[list]:
+        """米国株の日足履歴を取得 (Alpha Vantage, 追加APIコールなし)
+
+        get_us_stock() が既に _fetch_alpha_vantage() で ~100日分の
+        Time Series (Daily) を _us_cache に保持しているため、それを
+        古い→新しい順に並べ替えて直近 limit 件だけ返す。
+        """
+        if not self._alpha_key:
+            return None
+
+        if symbol in self._us_cache:
+            data = self._us_cache[symbol]
+        else:
+            data = self._fetch_alpha_vantage(symbol)
+            if data:
+                self._us_cache[symbol] = data
+
+        if not data:
+            return None
+
+        dates = sorted(data.keys())[-limit:]
+        return [
+            {"date": d, "close": round(float(data[d]["4. close"]), 2)}
+            for d in dates
+        ]
+
+    def get_us_top_movers(self) -> Optional[dict]:
+        """米国市場の値上がり/値下がり/出来高上位を取得 (Alpha Vantage TOP_GAINERS_LOSERS)
+
+        レスポンス形式(未認証環境のため実データで最終確認できていない前提):
+        {"top_gainers": [{"ticker","price","change_amount","change_percentage","volume"}, ...],
+         "top_losers": [...], "most_actively_traded": [...]}
+        フィールドは他のAlpha Vantageエンドポイント同様、文字列として返る想定。
+        """
+        if not self._alpha_key:
+            return None
+
+        elapsed = time.time() - self._alpha_last_call
+        if elapsed < ALPHA_VANTAGE_INTERVAL_SEC:
+            time.sleep(ALPHA_VANTAGE_INTERVAL_SEC - elapsed)
+        self._alpha_last_call = time.time()
+
+        try:
+            r = requests.get(
+                ALPHA_VANTAGE_BASE,
+                params={"function": "TOP_GAINERS_LOSERS", "apikey": self._alpha_key},
+                timeout=15,
+            )
+            r.raise_for_status()
+            data = r.json()
+
+            if "Note" in data or "Information" in data:
+                logger.warning(f"Alpha Vantage top-movers レート制限/情報: {data}")
+                return None
+
+            def _parse(items):
+                result = []
+                for item in items or []:
+                    try:
+                        result.append({
+                            "code": item.get("ticker", ""),
+                            "close": round(float(item.get("price", 0)), 2),
+                            "change_pct": round(
+                                float(str(item.get("change_percentage", "0")).rstrip("%")), 2
+                            ),
+                        })
+                    except (ValueError, TypeError):
+                        continue
+                return result
+
+            return {
+                "gainers": _parse(data.get("top_gainers"))[:10],
+                "losers": _parse(data.get("top_losers"))[:10],
+                "most_active": _parse(data.get("most_actively_traded"))[:10],
+            }
+        except Exception as e:
+            logger.error(f"Alpha Vantage top-movers取得エラー: {e}")
+            return None
+
+    def get_jp_stock_history(self, code: str, limit: int = 30) -> Optional[list]:
+        """日本株の日足履歴を取得 (J-Quants V2)
+
+        code のみを指定し date を省略すると、その銘柄の全履歴が返る
+        (J-Quants公式ドキュメント: code/date いずれか一方の指定が必須で、
+        code のみの場合は日付を横断した全データが返る)。V2でも同様の
+        挙動を想定しているが、実データでの最終確認は未実施。
+        """
+        cache_key = f"history_{code}"
+        if cache_key in self._jp_cache:
+            return self._jp_cache[cache_key]
+
+        if not self._jquants_api_key:
+            return None
+
+        clean_code = code.replace(".T", "").zfill(4)
+
+        try:
+            r = requests.get(
+                f"{JQUANTS_BASE}/prices/daily_quotes",
+                headers=self._jquants_headers(),
+                params={"code": clean_code},
+                timeout=15,
+            )
+            r.raise_for_status()
+
+            quotes = r.json().get("daily_quotes", [])
+            if not quotes:
+                return None
+
+            quotes.sort(key=lambda q: q.get("Date", ""))
+            history = [
+                {
+                    "date": q["Date"],
+                    "close": round(float(q.get("Close") or 0), 1),
+                }
+                for q in quotes[-limit:]
+                if q.get("Date") and q.get("Close")
+            ]
+            self._jp_cache[cache_key] = history
+            return history
+        except Exception as e:
+            logger.error(f"J-Quants history fetch error: code={code}, {e}")
+            return None
+
     def _fetch_alpha_vantage(self, symbol: str) -> Optional[dict]:
         """Alpha Vantage API を呼び出す (レート制限付き)"""
         # 5req/分 = 12秒間隔

@@ -80,4 +80,21 @@ final class APIService {
         struct Empty: Decodable {}
         let _: Empty = try await request("/users/\(userId)/watchlist/\(stockCode)", method: "DELETE")
     }
+
+    // ── 株価ダッシュボード ──────────────────────────────────────────
+
+    func getStockQuote(market: String, code: String) async throws -> StockQuote {
+        return try await request("/stocks/\(market)/\(code)/quote")
+    }
+
+    func getHotStocks() async throws -> HotStocksResponse {
+        return try await request("/stocks/hot")
+    }
+
+    func getStockNews(market: String, code: String, name: String) async throws -> [NewsItem] {
+        struct Res: Decodable { let news: [NewsItem] }
+        let encodedName = name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let res: Res = try await request("/stocks/\(market)/\(code)/news?name=\(encodedName)")
+        return res.news
+    }
 }

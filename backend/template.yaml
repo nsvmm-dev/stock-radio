@@ -61,6 +61,8 @@ Globals:
         JQUANTS_API_KEY: !Ref JQuantsApiKey
         ALPHA_VANTAGE_API_KEY: !Ref AlphaVantageApiKey
         FIREBASE_CREDENTIALS_PARAM: !Sub "/stock-radio/${Env}/firebase-credentials"
+        STOCK_PRICES_TABLE: !Ref StockPricesTable
+        HOT_STOCKS_TABLE: !Ref HotStocksTable
 
 Resources:
 
@@ -135,6 +137,30 @@ Resources:
         AttributeName: ttl
         Enabled: true
 
+  StockPricesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "stock-radio-stock-prices-${Env}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: marketCode
+          AttributeType: S
+      KeySchema:
+        - AttributeName: marketCode
+          KeyType: HASH
+
+  HotStocksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "stock-radio-hot-stocks-${Env}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: category
+          AttributeType: S
+      KeySchema:
+        - AttributeName: category
+          KeyType: HASH
+
   RadioGeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -152,6 +178,10 @@ Resources:
             TableName: !Ref WatchlistsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref RadiosTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref StockPricesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HotStocksTable
         - Statement:
             - Effect: Allow
               Action:
@@ -181,6 +211,10 @@ Resources:
             TableName: !Ref WatchlistsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref RadiosTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref StockPricesTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref HotStocksTable
         - Statement:
             - Effect: Allow
               Action:

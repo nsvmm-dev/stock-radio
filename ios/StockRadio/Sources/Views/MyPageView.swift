@@ -2,12 +2,18 @@ import SwiftUI
 
 struct MyPageView: View {
     @EnvironmentObject var appState: AppState
+    @StateObject private var vm = MyPageViewModel()
+    @State private var selectedMarket = "US"
 
     private let planOptions: [(String, String, String)] = [
         ("free",     "フリー",         "1日間保存・広告あり"),
         ("standard", "スタンダード",   "1ヶ月保存・広告なし"),
         ("pro",      "プロ",           "無制限保存・全機能"),
     ]
+
+    private var filteredWatchlist: [WatchlistItem] {
+        vm.watchlist.filter { $0.market == selectedMarket }
+    }
 
     var body: some View {
         NavigationStack {
@@ -37,12 +43,43 @@ struct MyPageView: View {
                     }
                 }
 
+                Section("お気に入り銘柄") {
+                    Picker("市場", selection: $selectedMarket) {
+                        Text("米国株").tag("US")
+                        Text("日本株").tag("JP")
+                    }
+                    .pickerStyle(.segmented)
+
+                    if vm.isLoading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    } else if filteredWatchlist.isEmpty {
+                        Text("この市場のお気に入り銘柄はありません")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(filteredWatchlist) { item in
+                            NavigationLink(value: StockRef(market: item.market, code: item.stockCode, name: item.stockName)) {
+                                WatchlistRowView(item: item) {
+                                    Task { await vm.remove(item, userId: appState.userId ?? "") }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Section("サポート") {
                     Link("利用規約", destination: URL(string: "https://example.com/terms")!)
                     Link("プライバシーポリシー", destination: URL(string: "https://example.com/privacy")!)
                 }
             }
             .navigationTitle("マイページ")
+            .navigationDestination(for: StockRef.self) { ref in
+                StockDetailView(ref: ref)
+            }
+            .task {
+                await vm.loadWatchlist(userId: appState.userId ?? "")
+            }
         }
     }
 
@@ -53,6 +90,33 @@ struct MyPageView: View {
         // 現状はローカル状態のみ更新
         appState.plan = plan
         LocalUser(userId: userId, plan: plan).save()
+    }
+}
+
+@MainActor
+final class MyPageViewModel: ObservableObject {
+    @Published var watchlist: [WatchlistItem] = []
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+
+    func loadWatchlist(userId: String) async {
+        guard !userId.isEmpty else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            watchlist = try await APIService.shared.getWatchlist(userId: userId)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func remove(_ item: WatchlistItem, userId: String) async {
+        do {
+            try await APIService.shared.removeFromWatchlist(userId: userId, stockCode: item.stockCode)
+            watchlist.removeAll { $0.id == item.id }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 

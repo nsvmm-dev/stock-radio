@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+from collections import Counter
 from datetime import datetime, timezone, timedelta
 
 import boto3
@@ -40,17 +41,44 @@ def lambda_handler(event, context):
 
     market_data = _fetch_market_overview(stock_fetcher, fetch_date)
     all_news = news_fetcher.get_all_news()
+    # 米国の値上がり/値下がり上位は全ユーザー共通 → ループ前に1回だけ取得
+    # (Alpha Vantage 25req/日の枠を最初に確保しておく)
+    top_movers = stock_fetcher.get_us_top_movers()
 
     generated, failed = 0, 0
+    unique_stock_prices: dict = {}  # marketCode -> {code, name, market}
+    jp_code_counter: Counter = Counter()  # JP銘柄コード -> ウォッチ登録ユーザー数
+
     for user in users:
+        user_id = user["userId"]
+        watchlist = _get_watchlist(user_id)
+        watchlist_data = _fetch_watchlist_data(watchlist, stock_fetcher, fetch_date)
+
+        for w in watchlist:
+            if w.get("market", "JP") == "JP":
+                jp_code_counter[w["stockCode"]] += 1
+
+        for s in watchlist_data:
+            market_code = f"{s['market']}#{s['code']}"
+            unique_stock_prices.setdefault(market_code, {
+                "market": s["market"], "code": s["code"], "name": s["name"],
+            })
+
         try:
-            _generate_for_user(user, radio_date, fetch_date, market_data, all_news, stock_fetcher, jst_now)
+            _generate_for_user(user, watchlist_data, radio_date, market_data, all_news, jst_now)
             generated += 1
         except Exception as e:
             logger.error(f"ユーザー {user.get('userId')} の生成失敗: {e}", exc_info=True)
             failed += 1
 
     logger.info(f"生成完了: success={generated}, failed={failed}")
+
+    try:
+        _update_stock_prices_table(stock_fetcher, unique_stock_prices)
+        _update_hot_stocks_table(top_movers, jp_code_counter, unique_stock_prices)
+    except Exception as e:
+        logger.error(f"株価キャッシュ更新失敗: {e}", exc_info=True)
+
     return {
         "statusCode": 200,
         "body": json.dumps({"generated": generated, "failed": failed, "date": radio_date}),
@@ -73,13 +101,10 @@ def _fetch_market_overview(stock_fetcher: StockFetcher, fetch_date: str) -> dict
     return market
 
 
-def _generate_for_user(user: dict, radio_date: str, fetch_date: str, market_data: dict,
-                        all_news: list, stock_fetcher: StockFetcher, jst_now: datetime):
+def _generate_for_user(user: dict, watchlist_data: list, radio_date: str, market_data: dict,
+                        all_news: list, jst_now: datetime):
     user_id = user["userId"]
     plan = user.get("plan", "free")
-
-    watchlist = _get_watchlist(user_id)
-    watchlist_data = _fetch_watchlist_data(watchlist, stock_fetcher, fetch_date)
 
     # ユーザーウォッチリストに関連するニュースをフィルタ
     relevant_news = _filter_relevant_news(all_news, watchlist_data)
@@ -193,3 +218,75 @@ def _get_watchlist(user_id: str) -> list:
 def _estimate_duration_sec(script: str) -> int:
     # 日本語は約5文字/秒で読まれる
     return len(script) // 5
+
+
+def _update_stock_prices_table(stock_fetcher: StockFetcher, unique_stock_prices: dict):
+    """当日ウォッチリストに登場した銘柄ごとに履歴を取得し StockPricesTable を更新"""
+    table = dynamodb.Table(os.environ["STOCK_PRICES_TABLE"])
+    now = datetime.now(JST).isoformat()
+
+    for market_code, info in unique_stock_prices.items():
+        market, code = info["market"], info["code"]
+        history = (
+            stock_fetcher.get_jp_stock_history(code)
+            if market == "JP"
+            else stock_fetcher.get_us_stock_series(code)
+        )
+        if not history:
+            continue
+
+        latest = history[-1]
+        prev = history[-2] if len(history) >= 2 else None
+        change_pct = (
+            round((latest["close"] - prev["close"]) / prev["close"] * 100, 2)
+            if prev and prev["close"]
+            else 0
+        )
+
+        # _update_hot_stocks_table (jp_popular) がこの後に参照するため in-place で補完
+        info["latestClose"] = latest["close"]
+        info["changePct"] = change_pct
+
+        table.put_item(Item={
+            "marketCode": market_code,
+            "market": market,
+            "code": code,
+            "name": info["name"],
+            "latestClose": latest["close"],
+            "changePct": change_pct,
+            "history": history,
+            "updatedAt": now,
+        })
+
+    logger.info(f"StockPricesTable更新: {len(unique_stock_prices)}銘柄")
+
+
+def _update_hot_stocks_table(top_movers: dict, jp_code_counter: Counter, unique_stock_prices: dict):
+    """当日の注目銘柄(米国値上がり/値下がり/出来高、日本の人気銘柄)を HotStocksTable に保存"""
+    table = dynamodb.Table(os.environ["HOT_STOCKS_TABLE"])
+    now = datetime.now(JST).isoformat()
+
+    if top_movers:
+        for category_key, us_key in (
+            ("us_gainers", "gainers"), ("us_losers", "losers"), ("us_most_active", "most_active"),
+        ):
+            items = [
+                {"market": "US", "code": m["code"], "name": m["code"], "latestClose": m["close"],
+                 "changePct": m["change_pct"]}
+                for m in top_movers.get(us_key, [])
+            ]
+            table.put_item(Item={"category": category_key, "items": items, "updatedAt": now})
+
+    # 日本株の「人気銘柄」= 全ユーザーのウォッチリストでの登場回数が多い順
+    jp_popular = []
+    for code, _count in jp_code_counter.most_common(10):
+        info = unique_stock_prices.get(f"JP#{code}")
+        if not info:
+            continue  # その日の価格取得に失敗した銘柄は除外
+        jp_popular.append({
+            "market": "JP", "code": code, "name": info["name"],
+            "latestClose": info.get("latestClose"), "changePct": info.get("changePct"),
+        })
+
+    table.put_item(Item={"category": "jp_popular", "items": jp_popular, "updatedAt": now})
+    logger.info("HotStocksTable更新完了")
