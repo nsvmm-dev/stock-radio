@@ -20,64 +20,68 @@ AUDIO_URL_EXPIRE_SEC = 3600  # presigned URL有効期限: 1時間
 def lambda_handler(event, context):
     method = event.get("httpMethod", "GET")
     path = event.get("path", "/")
-    path_params = event.get("pathParameters") or {}
     query_params = event.get("queryStringParameters") or {}
     body = _parse_body(event)
 
     logger.info(f"{method} {path}")
 
     try:
-        return _route(method, path, path_params, query_params, body)
+        return _route(method, path, query_params, body)
     except Exception as e:
         logger.error(f"未処理エラー: {e}", exc_info=True)
         return _res(500, {"error": "internal server error"})
 
 
-def _route(method, path, path_params, query_params, body):
+def _route(method, path, query_params, body):
     # OPTIONS (CORS プリフライト)
     if method == "OPTIONS":
         return _res(200, {})
 
+    # API Gateway が /{proxy+} の単一ルートのため、pathParameters に
+    # userId 等は入らない（"proxy" キーのみ）。path を自前で分解する。
+    segments = [s for s in path.split("/") if s]
+
     # POST /users
-    if path == "/users" and method == "POST":
+    if segments == ["users"] and method == "POST":
         return _create_user(body)
 
-    user_id = path_params.get("userId")
-
-    # GET /users/{userId}
-    if user_id and path.endswith(f"/users/{user_id}") and method == "GET":
-        return _get_user(user_id)
-
-    # PUT /users/{userId}/plan
-    if user_id and path.endswith("/plan") and method == "PUT":
-        return _update_plan(user_id, body)
-
-    # PUT /users/{userId}/fcm-token
-    if user_id and path.endswith("/fcm-token") and method == "PUT":
-        return _update_fcm_token(user_id, body)
-
-    # GET /users/{userId}/radios
-    if user_id and path.endswith("/radios") and method == "GET":
-        return _list_radios(user_id)
-
-    # GET /users/{userId}/radios/{date}
-    radio_date = path_params.get("date")
-    if user_id and radio_date and method == "GET":
-        return _get_radio(user_id, radio_date)
-
-    # GET/POST/DELETE /users/{userId}/watchlist
-    if user_id and "/watchlist" in path:
-        stock_code = path_params.get("stockCode")
-        if method == "GET":
-            return _get_watchlist(user_id)
-        if method == "POST":
-            return _add_watchlist(user_id, body)
-        if method == "DELETE" and stock_code:
-            return _remove_watchlist(user_id, stock_code)
-
     # GET /stocks/search?q=xxx
-    if path == "/stocks/search" and method == "GET":
+    if segments == ["stocks", "search"] and method == "GET":
         return _search_stocks(query_params.get("q", ""))
+
+    if len(segments) >= 2 and segments[0] == "users":
+        user_id = segments[1]
+
+        # GET /users/{userId}
+        if len(segments) == 2 and method == "GET":
+            return _get_user(user_id)
+
+        # PUT /users/{userId}/plan
+        if len(segments) == 3 and segments[2] == "plan" and method == "PUT":
+            return _update_plan(user_id, body)
+
+        # PUT /users/{userId}/fcm-token
+        if len(segments) == 3 and segments[2] == "fcm-token" and method == "PUT":
+            return _update_fcm_token(user_id, body)
+
+        # GET /users/{userId}/radios
+        if len(segments) == 3 and segments[2] == "radios" and method == "GET":
+            return _list_radios(user_id)
+
+        # GET /users/{userId}/radios/{date}
+        if len(segments) == 4 and segments[2] == "radios" and method == "GET":
+            return _get_radio(user_id, segments[3])
+
+        # GET/POST /users/{userId}/watchlist
+        if len(segments) == 3 and segments[2] == "watchlist":
+            if method == "GET":
+                return _get_watchlist(user_id)
+            if method == "POST":
+                return _add_watchlist(user_id, body)
+
+        # DELETE /users/{userId}/watchlist/{stockCode}
+        if len(segments) == 4 and segments[2] == "watchlist" and method == "DELETE":
+            return _remove_watchlist(user_id, segments[3])
 
     return _res(404, {"error": "not found"})
 

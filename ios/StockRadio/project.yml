@@ -1,0 +1,46 @@
+name: StockRadio
+options:
+  bundleIdPrefix: com.stockradio
+  deploymentTarget:
+    iOS: "17.0"
+
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: 11.0.0
+
+targets:
+  StockRadio:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - Resources
+    resources:
+      - GoogleService-Info.plist
+    dependencies:
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseMessaging
+    info:
+      path: Sources/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UIBackgroundModes:
+          - audio
+          - fetch
+          - remote-notification
+    entitlements:
+      path: StockRadio.entitlements
+      properties:
+        aps-environment: development
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.stockradio.app
+        PRODUCT_NAME: StockRadio
+        DEVELOPMENT_TEAM: ""
+        SWIFT_VERSION: 5.0
+        TARGETED_DEVICE_FAMILY: 1
+    scheme:
+      testTargets: []

@@ -1,7 +1,7 @@
 import Foundation
 
 // SAMデプロイ後に表示される ApiGatewayUrl に変更
-private let baseURL = "https://YOUR_API_ID.execute-api.ap-northeast-1.amazonaws.com/Prod"
+private let baseURL = "https://69v9j095k7.execute-api.ap-northeast-1.amazonaws.com/Prod"
 
 enum APIError: Error {
     case invalidURL

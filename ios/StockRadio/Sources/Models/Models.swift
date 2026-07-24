@@ -9,7 +9,7 @@ struct UserResponse: Codable {
     var createdAt: String?
 }
 
-struct RadioMeta: Codable, Identifiable {
+struct RadioMeta: Codable, Identifiable, Hashable {
     var id: String { radioDate }
     let userId: String
     let radioDate: String
