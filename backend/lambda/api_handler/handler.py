@@ -3,6 +3,7 @@ import os
 import logging
 import uuid
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -221,6 +222,12 @@ def _parse_body(event: dict) -> dict:
         return {}
 
 
+def _json_default(obj):
+    if isinstance(obj, Decimal):
+        return int(obj) if obj % 1 == 0 else float(obj)
+    return str(obj)
+
+
 def _res(status: int, body: dict):
     return {
         "statusCode": status,
@@ -230,5 +237,5 @@ def _res(status: int, body: dict):
             "Access-Control-Allow-Headers": "Content-Type,Authorization",
             "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
         },
-        "body": json.dumps(body, ensure_ascii=False, default=str),
+        "body": json.dumps(body, ensure_ascii=False, default=_json_default),
     }
