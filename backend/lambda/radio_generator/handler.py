@@ -79,6 +79,11 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.error(f"株価キャッシュ更新失敗: {e}", exc_info=True)
 
+    try:
+        _update_jp_stock_master(stock_fetcher)
+    except Exception as e:
+        logger.error(f"銘柄マスタ更新失敗: {e}", exc_info=True)
+
     return {
         "statusCode": 200,
         "body": json.dumps({"generated": generated, "failed": failed, "date": radio_date}),
@@ -290,3 +295,19 @@ def _update_hot_stocks_table(top_movers: dict, jp_code_counter: Counter, unique_
 
     table.put_item(Item={"category": "jp_popular", "items": jp_popular, "updatedAt": now})
     logger.info("HotStocksTable更新完了")
+
+
+def _update_jp_stock_master(stock_fetcher: StockFetcher):
+    """日本株の全上場銘柄一覧を取得し、検索用に S3 へ保存(1日1回)"""
+    master = stock_fetcher.get_jp_stock_master()
+    if not master:
+        logger.warning("銘柄マスタ取得失敗のためS3更新をスキップ")
+        return
+
+    s3.put_object(
+        Bucket=os.environ["AUDIO_BUCKET"],
+        Key="stock-master/jp.json",
+        Body=json.dumps(master, ensure_ascii=False).encode("utf-8"),
+        ContentType="application/json",
+    )
+    logger.info(f"銘柄マスタ更新: {len(master)}銘柄")

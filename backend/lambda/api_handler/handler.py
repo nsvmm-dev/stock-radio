@@ -18,6 +18,13 @@ dynamodb = boto3.resource("dynamodb")
 s3 = boto3.client("s3")
 
 AUDIO_URL_EXPIRE_SEC = 3600  # presigned URL有効期限: 1時間
+MAX_SEARCH_RESULTS = 20
+
+# 米国株: S&P500構成銘柄の静的リスト(商用利用の外部API呼び出しを避けるため同梱)
+with open(os.path.join(os.path.dirname(__file__), "us_tickers.json"), encoding="utf-8") as f:
+    _US_TICKERS = json.load(f)
+
+_jp_stock_master_cache = None  # Lambda実行コンテナ内でのメモリキャッシュ(コールドスタート毎に再取得)
 
 
 def lambda_handler(event, context):
@@ -48,9 +55,9 @@ def _route(method, path, query_params, body):
     if segments == ["users"] and method == "POST":
         return _create_user(body)
 
-    # GET /stocks/search?q=xxx
+    # GET /stocks/search?q=xxx&market=JP|US
     if segments == ["stocks", "search"] and method == "GET":
-        return _search_stocks(query_params.get("q", ""))
+        return _search_stocks(query_params.get("q", ""), query_params.get("market", ""))
 
     # GET /stocks/hot
     if segments == ["stocks", "hot"] and method == "GET":
@@ -217,10 +224,56 @@ def _remove_watchlist(user_id: str, stock_code: str):
 
 # ── 株式検索 ─────────────────────────────────────────────────────────
 
-def _search_stocks(query: str):
-    # TODO: J-Quants の銘柄マスタを使った検索を実装
-    # 現時点はスタブ実装
-    return _res(200, {"results": [], "query": query})
+def _search_stocks(query: str, market: str):
+    query = query.strip()
+    if not query:
+        return _res(200, {"results": [], "query": query})
+
+    market = market.upper()
+    results = []
+    if market in ("", "US"):
+        results += _search_us_tickers(query)
+    if market in ("", "JP"):
+        results += _search_jp_stock_master(query)
+
+    return _res(200, {"results": results[:MAX_SEARCH_RESULTS], "query": query})
+
+
+def _search_us_tickers(query: str) -> list:
+    q = query.lower()
+    matched = [
+        t for t in _US_TICKERS
+        if q in t["code"].lower() or q in t["name"].lower()
+    ]
+    return [{"market": "US", "code": t["code"], "name": t["name"]} for t in matched[:MAX_SEARCH_RESULTS]]
+
+
+def _search_jp_stock_master(query: str) -> list:
+    master = _load_jp_stock_master()
+    q = query.lower()
+    matched = [
+        t for t in master
+        if q in t["code"].lower() or q in t["name"].lower()
+    ]
+    return [{"market": "JP", "code": t["code"], "name": t["name"]} for t in matched[:MAX_SEARCH_RESULTS]]
+
+
+def _load_jp_stock_master() -> list:
+    global _jp_stock_master_cache
+    if _jp_stock_master_cache is not None:
+        return _jp_stock_master_cache
+
+    try:
+        obj = s3.get_object(Bucket=os.environ["AUDIO_BUCKET"], Key="stock-master/jp.json")
+        _jp_stock_master_cache = json.loads(obj["Body"].read())
+    except s3.exceptions.NoSuchKey:
+        logger.warning("銘柄マスタ未生成(日次バッチ未実行)")
+        _jp_stock_master_cache = []
+    except Exception as e:
+        logger.error(f"銘柄マスタ取得エラー: {e}")
+        _jp_stock_master_cache = []
+
+    return _jp_stock_master_cache
 
 
 # ── 株価・注目銘柄・ニュース ───────────────────────────────────────────

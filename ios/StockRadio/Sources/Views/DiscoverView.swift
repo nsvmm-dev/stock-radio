@@ -37,6 +37,14 @@ struct DiscoverView: View {
             } message: {
                 Text(vm.errorMessage ?? "")
             }
+            .alert("追加しました", isPresented: Binding(
+                get: { vm.addedStockName != nil },
+                set: { if !$0 { vm.addedStockName = nil } }
+            )) {
+                Button("OK") { vm.addedStockName = nil }
+            } message: {
+                Text("「\(vm.addedStockName ?? "")」をお気に入り銘柄に追加しました。マイページから確認できます。")
+            }
         }
     }
 
@@ -56,40 +64,112 @@ struct DiscoverView: View {
 
 struct AddStockRow: View {
     let onAdd: (String, String, String) -> Void
-    @State private var code = ""
-    @State private var name = ""
+
+    @State private var query = ""
     @State private var market = "US"
+    @State private var searchResults: [StockSearchResult] = []
+    @State private var isSearching = false
+    @State private var selectedResult: StockSearchResult?
+    @State private var searchTask: Task<Void, Never>?
 
-    private var trimmedCode: String { code.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-
-    private var codePlaceholder: String { market == "JP" ? "コード (例: 7203)" : "コード (例: AAPL)" }
-    private var namePlaceholder: String { market == "JP" ? "銘柄名 (例: トヨタ自動車)" : "銘柄名 (例: Apple)" }
+    private var queryPlaceholder: String {
+        market == "JP" ? "コードまたは銘柄名 (例: 7203 / トヨタ)" : "コードまたは銘柄名 (例: AAPL / Apple)"
+    }
+    private var trimmedQuery: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                TextField(codePlaceholder, text: $code)
-                    .textInputAutocapitalization(.characters)
+                TextField(queryPlaceholder, text: $query)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onChange(of: query) { _, newValue in
+                        scheduleSearch(newValue)
+                    }
                 Picker("市場", selection: $market) {
                     Text("米国").tag("US")
                     Text("東証").tag("JP")
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 120)
+                .onChange(of: market) { _, _ in
+                    scheduleSearch(query)
+                }
             }
-            TextField(namePlaceholder, text: $name)
 
-            Button("追加") {
-                onAdd(trimmedCode.uppercased(), trimmedName, market)
-                code = ""
-                name = ""
+            if isSearching {
+                ProgressView()
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else if !trimmedQuery.isEmpty && searchResults.isEmpty {
+                Text("該当する銘柄が見つかりません")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(searchResults) { result in
+                    Button {
+                        selectedResult = result
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(result.name)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(.primary)
+                                Text(result.code)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "plus.circle")
+                                .foregroundStyle(.blue)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .frame(maxWidth: .infinity)
-            .disabled(trimmedCode.isEmpty || trimmedName.isEmpty)
         }
         .padding(.vertical, 4)
+        .confirmationDialog(
+            selectedResult.map { "「\($0.name)」を登録しますか？" } ?? "",
+            isPresented: Binding(
+                get: { selectedResult != nil },
+                set: { if !$0 { selectedResult = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("登録") {
+                if let result = selectedResult {
+                    onAdd(result.code, result.name, result.market)
+                    query = ""
+                    searchResults = []
+                }
+                selectedResult = nil
+            }
+            Button("キャンセル", role: .cancel) {
+                selectedResult = nil
+            }
+        }
+    }
+
+    private func scheduleSearch(_ text: String) {
+        searchTask?.cancel()
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            searchResults = []
+            isSearching = false
+            return
+        }
+
+        isSearching = true
+        searchTask = Task {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else { return }
+
+            let results = (try? await APIService.shared.searchStocks(query: trimmed, market: market)) ?? []
+            guard !Task.isCancelled else { return }
+            searchResults = results
+            isSearching = false
+        }
     }
 }
 
@@ -97,6 +177,7 @@ struct AddStockRow: View {
 final class DiscoverViewModel: ObservableObject {
     @Published var hotStocks: HotStocksResponse?
     @Published var errorMessage: String?
+    @Published var addedStockName: String?
 
     func loadHotStocks() async {
         do {
@@ -107,12 +188,17 @@ final class DiscoverViewModel: ObservableObject {
     }
 
     func add(code: String, name: String, market: String, userId: String) async {
+        guard !userId.isEmpty else {
+            errorMessage = "ユーザー情報が見つかりません。アプリを再起動してください。"
+            return
+        }
         do {
-            _ = try await APIService.shared.addToWatchlist(
+            let item = try await APIService.shared.addToWatchlist(
                 userId: userId, stockCode: code, stockName: name, market: market
             )
+            addedStockName = item.stockName
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "追加に失敗しました: \(error.localizedDescription)"
         }
     }
 }

@@ -97,4 +97,11 @@ final class APIService {
         let res: Res = try await request("/stocks/\(market)/\(code)/news?name=\(encodedName)")
         return res.news
     }
+
+    func searchStocks(query: String, market: String) async throws -> [StockSearchResult] {
+        struct Res: Decodable { let results: [StockSearchResult] }
+        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let res: Res = try await request("/stocks/search?q=\(encodedQuery)&market=\(market)")
+        return res.results
+    }
 }

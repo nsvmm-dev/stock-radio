@@ -76,6 +76,35 @@ class StockFetcher:
             logger.error(f"J-Quants stock fetch error: code={code}, {e}")
             return None
 
+    def get_jp_stock_master(self) -> Optional[list]:
+        """日本株の全上場銘柄一覧を取得 (J-Quants V2 /listed/info)"""
+        if not self._jquants_api_key:
+            return None
+
+        try:
+            r = requests.get(
+                f"{JQUANTS_BASE}/listed/info",
+                headers=self._jquants_headers(),
+                timeout=30,
+            )
+            r.raise_for_status()
+
+            info = r.json().get("info", [])
+            result = []
+            for item in info:
+                code, name = item.get("Code"), item.get("CompanyName")
+                if not code or not name:
+                    continue
+                # v2の/listed/infoは5桁(4桁コード+チェック用の"0")で返るため、
+                # get_jp_stock 等が使う4桁コードに正規化して揃える
+                if len(code) == 5 and code.endswith("0"):
+                    code = code[:4]
+                result.append({"code": code, "name": name})
+            return result
+        except Exception as e:
+            logger.error(f"J-Quants listed/info fetch error: {e}")
+            return None
+
     def get_jp_index(self, index_code: str, date: str) -> Optional[dict]:
         """日経平均・TOPIX を取得 (J-Quants V2)"""
         if not self._jquants_api_key:

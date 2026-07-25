@@ -53,6 +53,13 @@ struct StockPricePoint: Codable, Identifiable, Hashable {
     var id: String { date }
 }
 
+struct StockSearchResult: Codable, Identifiable, Hashable {
+    let market: String
+    let code: String
+    let name: String
+    var id: String { "\(market)#\(code)" }
+}
+
 struct StockQuote: Codable {
     let market: String
     let code: String
