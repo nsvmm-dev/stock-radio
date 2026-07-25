@@ -10,6 +10,11 @@ enum APIError: Error {
     case serverError(Int)
 }
 
+struct APIMessageError: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
 final class APIService {
     static let shared = APIService()
     private init() {}
@@ -37,9 +42,14 @@ final class APIService {
 
     // ── ユーザー ────────────────────────────────────────────────────
 
-    func createUser(email: String, fcmToken: String) async throws -> UserResponse {
-        struct Body: Encodable { let email: String; let fcmToken: String }
-        return try await request("/users", method: "POST", body: Body(email: email, fcmToken: fcmToken))
+    func createUser(email: String, fcmToken: String, language: String) async throws -> UserResponse {
+        struct Body: Encodable { let email: String; let fcmToken: String; let language: String }
+        return try await request("/users", method: "POST",
+                                  body: Body(email: email, fcmToken: fcmToken, language: language))
+    }
+
+    func getUser(userId: String) async throws -> UserResponse {
+        return try await request("/users/\(userId)")
     }
 
     func updateFCMToken(userId: String, token: String) async throws {
@@ -47,6 +57,37 @@ final class APIService {
         struct Empty: Decodable {}
         let _: Empty = try await request("/users/\(userId)/fcm-token", method: "PUT",
                                          body: Body(fcmToken: token))
+    }
+
+    /// ラジオ言語の変更。free プランやクールダウン中は 403 とともにサーバー側の
+    /// メッセージ(次回変更可能日など)が返るため、専用のエラー型で伝える。
+    func updateRadioLanguage(userId: String, language: String) async throws -> String {
+        guard let url = URL(string: baseURL + "/users/\(userId)/language") else { throw APIError.invalidURL }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "PUT"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        struct Body: Encodable { let language: String }
+        req.httpBody = try JSONEncoder().encode(Body(language: language))
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else { throw APIError.noData }
+
+        if (200..<300).contains(http.statusCode) {
+            struct Res: Decodable { let language: String }
+            let res = try JSONDecoder().decode(Res.self, from: data)
+            return res.language
+        }
+
+        struct ErrorRes: Decodable { let message: String?; let nextAvailableDate: String? }
+        if let errRes = try? JSONDecoder().decode(ErrorRes.self, from: data) {
+            var message = errRes.message ?? "ラジオ言語の変更に失敗しました"
+            if let date = errRes.nextAvailableDate {
+                message += "\n次回変更可能日: \(date)"
+            }
+            throw APIMessageError(message: message)
+        }
+        throw APIError.serverError(http.statusCode)
     }
 
     // ── ラジオ ───────────────────────────────────────────────────────

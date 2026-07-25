@@ -56,7 +56,7 @@ struct RadioRowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let count = radio.stockCount, count > 0 {
-                    Text("\(count) 銘柄")
+                    Text("\(count) " + localized("銘柄"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

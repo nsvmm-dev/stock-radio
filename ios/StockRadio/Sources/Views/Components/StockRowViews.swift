@@ -31,7 +31,7 @@ struct FavoriteStockRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.stockName)
                     .font(.headline)
-                Text("\(item.stockCode) · \(item.market == "JP" ? "東証" : "米国")")
+                Text("\(item.stockCode) · \(item.market.marketDisplayName)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -59,7 +59,7 @@ struct HotStockRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(stock.name)
                     .font(.headline)
-                Text("\(stock.code) · \(stock.market == "JP" ? "東証" : "米国")")
+                Text("\(stock.code) · \(stock.market.marketDisplayName)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -102,7 +102,7 @@ struct WatchlistRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.stockName)
                     .font(.headline)
-                Text("\(item.stockCode) · \(item.market == "JP" ? "東証" : "米国")")
+                Text("\(item.stockCode) · \(item.market.marketDisplayName)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

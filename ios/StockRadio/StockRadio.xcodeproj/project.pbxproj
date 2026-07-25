@@ -13,6 +13,7 @@
 		2F700B5C1BC38874DFA46926 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CE4F84C565F12AC8287609 /* APIService.swift */; };
 		3602C151A75C8E0C079F3616 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92C6919F522DC860166EDCA /* HomeView.swift */; };
 		465D138B9CF98E70B29E3A25 /* RadioPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E37566E0E0E8F235173FE770 /* RadioPlayerView.swift */; };
+		6BBFC19A5A04213E47FCA924 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = CFABF2584323777BEE610E83 /* Localizable.xcstrings */; };
 		74DE872748783B98D38109D2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D30DD7CB6EB191AA291494DF /* Assets.xcassets */; };
 		87A5F75985512B882B2001D4 /* AudioPlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B1BD54BFF6CE5A971548E25 /* AudioPlayerService.swift */; };
 		87FD36E032B8F62BDDA89970 /* StockDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E972F9A64A804AB4AF3B454A /* StockDetailView.swift */; };
@@ -36,6 +37,7 @@
 		81BCC2CDADC11F27968B7E4F /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		8C4F263F06F49E8FC837CDCF /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		B5A2F9AF1523E0634204B4ED /* StockRowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StockRowViews.swift; sourceTree = "<group>"; };
+		CFABF2584323777BEE610E83 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		D30DD7CB6EB191AA291494DF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D7140F1C99534CDBE7E72A26 /* HomeDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDashboardView.swift; sourceTree = "<group>"; };
 		E37566E0E0E8F235173FE770 /* RadioPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioPlayerView.swift; sourceTree = "<group>"; };
@@ -104,6 +106,7 @@
 			isa = PBXGroup;
 			children = (
 				6F6987343DF40714E6DE08C0 /* Info.plist */,
+				CFABF2584323777BEE610E83 /* Localizable.xcstrings */,
 				E2DEA219ABA7FCDDD778A5C5 /* App */,
 				5751CB6CAD35901DD7BA22CB /* Models */,
 				2E75CDBB8EF2476CEBFFC427 /* Services */,
@@ -182,11 +185,12 @@
 				};
 			};
 			buildConfigurationList = D454DA8FDF07E76A8DA61DAA /* Build configuration list for PBXProject "StockRadio" */;
-			developmentRegion = en;
+			developmentRegion = ja;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
 				en,
+				ja,
 			);
 			mainGroup = 45CA373B3D7CFAB0FA73849F;
 			minimizedProjectReferenceProxies = 1;
@@ -209,6 +213,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				74DE872748783B98D38109D2 /* Assets.xcassets in Resources */,
+				6BBFC19A5A04213E47FCA924 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -7,6 +7,7 @@ struct UserResponse: Codable {
     let plan: String
     var email: String?
     var createdAt: String?
+    var language: String?
 }
 
 struct RadioMeta: Codable, Identifiable, Hashable {
@@ -110,18 +111,43 @@ enum Plan: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .free:     return "フリー"
-        case .standard: return "スタンダード"
-        case .pro:      return "プロ"
+        case .free:     return localized("フリー")
+        case .standard: return localized("スタンダード")
+        case .pro:      return localized("プロ")
         }
     }
 
     var retentionText: String {
         switch self {
-        case .free:     return "1日間保存"
-        case .standard: return "1ヶ月間保存"
-        case .pro:      return "無制限保存"
+        case .free:     return localized("1日間保存")
+        case .standard: return localized("1ヶ月間保存")
+        case .pro:      return localized("無制限保存")
         }
+    }
+}
+
+// ── 表示補助 ────────────────────────────────────────────────────────
+
+let displayLanguageDefaultsKey = "display_language"
+
+/// マイページの「表示言語」設定に基づいてローカライズ文字列を解決する。
+/// SwiftUI の `.environment(\.locale:)` はビュー階層内の `Text` にしか効かないため、
+/// ViewModel やモデル層で明示的にローカライズする際はこの関数を使う。
+/// `String(localized:locale:)` は Bundle.main の解決に依存し確実に言語を
+/// 切り替えられないケースがあるため、該当言語の .lproj バンドルを明示的に指定する。
+func localized(_ value: String.LocalizationValue) -> String {
+    let language = UserDefaults.standard.string(forKey: displayLanguageDefaultsKey) ?? "ja"
+    guard let path = Bundle.main.path(forResource: language, ofType: "lproj"),
+          let bundle = Bundle(path: path) else {
+        return String(localized: value)
+    }
+    return String(localized: value, bundle: bundle)
+}
+
+extension String {
+    /// "JP"/"US" マーケットコードの表示名(ローカライズ済み)
+    var marketDisplayName: String {
+        self == "JP" ? localized("東証") : localized("米国")
     }
 }
 
@@ -130,6 +156,7 @@ enum Plan: String, CaseIterable {
 struct LocalUser: Codable {
     let userId: String
     var plan: String
+    var radioLanguage: String?
 
     static let storageKey = "local_user"
 

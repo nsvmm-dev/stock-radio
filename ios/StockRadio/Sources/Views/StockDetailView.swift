@@ -54,7 +54,7 @@ struct StockDetailView: View {
     @ViewBuilder
     private var quoteHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("\(ref.code) · \(ref.market == "JP" ? "東証" : "米国")")
+            Text("\(ref.code) · \(ref.market.marketDisplayName)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 

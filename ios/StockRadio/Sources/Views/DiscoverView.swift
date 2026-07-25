@@ -7,10 +7,10 @@ struct DiscoverView: View {
     var body: some View {
         NavigationStack {
             List {
-                hotStocksSection(title: "米国 値上がり", stocks: vm.hotStocks?.usGainers)
-                hotStocksSection(title: "米国 値下がり", stocks: vm.hotStocks?.usLosers)
-                hotStocksSection(title: "米国 出来高上位", stocks: vm.hotStocks?.usMostActive)
-                hotStocksSection(title: "日本 人気銘柄", stocks: vm.hotStocks?.jpPopular)
+                hotStocksSection(title: localized("米国 値上がり"), stocks: vm.hotStocks?.usGainers)
+                hotStocksSection(title: localized("米国 値下がり"), stocks: vm.hotStocks?.usLosers)
+                hotStocksSection(title: localized("米国 出来高上位"), stocks: vm.hotStocks?.usMostActive)
+                hotStocksSection(title: localized("日本 人気銘柄"), stocks: vm.hotStocks?.jpPopular)
 
                 Section("銘柄を追加") {
                     AddStockRow { code, name, market in
@@ -73,7 +73,9 @@ struct AddStockRow: View {
     @State private var searchTask: Task<Void, Never>?
 
     private var queryPlaceholder: String {
-        market == "JP" ? "コードまたは銘柄名 (例: 7203 / トヨタ)" : "コードまたは銘柄名 (例: AAPL / Apple)"
+        market == "JP"
+            ? localized("コードまたは銘柄名 (例: 7203 / トヨタ)")
+            : localized("コードまたは銘柄名 (例: AAPL / Apple)")
     }
     private var trimmedQuery: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
 
@@ -130,7 +132,7 @@ struct AddStockRow: View {
         }
         .padding(.vertical, 4)
         .confirmationDialog(
-            selectedResult.map { "「\($0.name)」を登録しますか？" } ?? "",
+            selectedResult.map { localized("「\($0.name)」を登録しますか？") } ?? "",
             isPresented: Binding(
                 get: { selectedResult != nil },
                 set: { if !$0 { selectedResult = nil } }
@@ -189,7 +191,7 @@ final class DiscoverViewModel: ObservableObject {
 
     func add(code: String, name: String, market: String, userId: String) async {
         guard !userId.isEmpty else {
-            errorMessage = "ユーザー情報が見つかりません。アプリを再起動してください。"
+            errorMessage = localized("ユーザー情報が見つかりません。アプリを再起動してください。")
             return
         }
         do {
@@ -198,7 +200,7 @@ final class DiscoverViewModel: ObservableObject {
             )
             addedStockName = item.stockName
         } catch {
-            errorMessage = "追加に失敗しました: \(error.localizedDescription)"
+            errorMessage = localized("追加に失敗しました: \(error.localizedDescription)")
         }
     }
 }

@@ -163,7 +163,7 @@ final class RadioPlayerViewModel: ObservableObject {
             }
             AudioPlayerService.shared.play(radio: radio, audioURL: url)
         } catch {
-            errorMessage = "音声の取得に失敗しました: \(error.localizedDescription)"
+            errorMessage = localized("音声の取得に失敗しました: \(error.localizedDescription)")
         }
     }
 }

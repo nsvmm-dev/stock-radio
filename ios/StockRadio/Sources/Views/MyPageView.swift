@@ -4,11 +4,12 @@ struct MyPageView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = MyPageViewModel()
     @State private var selectedMarket = "US"
+    @State private var pendingRadioLanguage: String?
 
     private let planOptions: [(String, String, String)] = [
-        ("free",     "フリー",         "1日間保存・広告あり"),
-        ("standard", "スタンダード",   "1ヶ月保存・広告なし"),
-        ("pro",      "プロ",           "無制限保存・全機能"),
+        ("free",     localized("フリー"),       localized("1日間保存・広告あり")),
+        ("standard", localized("スタンダード"), localized("1ヶ月保存・広告なし")),
+        ("pro",      localized("プロ"),         localized("無制限保存・全機能")),
     ]
 
     private var filteredWatchlist: [WatchlistItem] {
@@ -20,7 +21,7 @@ struct MyPageView: View {
             List {
                 Section("アカウント") {
                     LabeledContent("ユーザーID") {
-                        Text(appState.userId ?? "未設定")
+                        Text(appState.userId ?? localized("未設定"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -41,6 +42,51 @@ struct MyPageView: View {
                             Task { await changePlan(to: value) }
                         }
                     }
+                }
+
+                Section("表示言語") {
+                    Picker("表示言語", selection: $appState.displayLanguage) {
+                        Text("日本語").tag("ja")
+                        Text("English").tag("en")
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Section {
+                    if appState.plan == "free" {
+                        LabeledContent("ラジオ言語") {
+                            Text(appState.radioLanguage == "en" ? "English" : "日本語")
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("有料プランにアップグレードすると変更できます")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Picker("ラジオ言語", selection: Binding(
+                            get: { appState.radioLanguage },
+                            set: { newValue in
+                                if newValue != appState.radioLanguage {
+                                    pendingRadioLanguage = newValue
+                                }
+                            }
+                        )) {
+                            Text("日本語").tag("ja")
+                            Text("English").tag("en")
+                        }
+                        .pickerStyle(.segmented)
+                        .disabled(vm.isChangingLanguage)
+
+                        if vm.isChangingLanguage {
+                            ProgressView()
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        }
+
+                        Text("変更は翌日の放送から反映されます。一度変更すると30日間は再変更できません。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("ラジオ言語")
                 }
 
                 Section("お気に入り銘柄") {
@@ -79,17 +125,45 @@ struct MyPageView: View {
             }
             .task {
                 await vm.loadWatchlist(userId: appState.userId ?? "")
+                await vm.refreshUser(appState: appState)
+            }
+            .confirmationDialog(
+                "ラジオ言語を変更しますか？",
+                isPresented: Binding(
+                    get: { pendingRadioLanguage != nil },
+                    set: { if !$0 { pendingRadioLanguage = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("変更する") {
+                    if let language = pendingRadioLanguage {
+                        Task { await vm.updateRadioLanguage(language, appState: appState) }
+                    }
+                    pendingRadioLanguage = nil
+                }
+                Button("キャンセル", role: .cancel) {
+                    pendingRadioLanguage = nil
+                }
+            } message: {
+                Text("変更は翌日の放送から反映されます。一度変更すると30日間は再変更できません。")
+            }
+            .alert("エラー", isPresented: Binding(
+                get: { vm.errorMessage != nil },
+                set: { if !$0 { vm.errorMessage = nil } }
+            )) {
+                Button("OK") { vm.errorMessage = nil }
+            } message: {
+                Text(vm.errorMessage ?? "")
             }
         }
     }
 
     private func changePlan(to plan: String) async {
-        guard let userId = appState.userId else { return }
+        guard appState.userId != nil else { return }
         struct PlanBody: Encodable { let plan: String }
         // TODO: APIService に updatePlan を追加して呼び出す
         // 現状はローカル状態のみ更新
-        appState.plan = plan
-        LocalUser(userId: userId, plan: plan).save()
+        appState.updatePlan(plan)
     }
 }
 
@@ -97,6 +171,7 @@ struct MyPageView: View {
 final class MyPageViewModel: ObservableObject {
     @Published var watchlist: [WatchlistItem] = []
     @Published var isLoading = false
+    @Published var isChangingLanguage = false
     @Published var errorMessage: String?
 
     func loadWatchlist(userId: String) async {
@@ -105,6 +180,32 @@ final class MyPageViewModel: ObservableObject {
         defer { isLoading = false }
         do {
             watchlist = try await APIService.shared.getWatchlist(userId: userId)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// バックエンドの最新状態(プラン・ラジオ言語)でローカルのキャッシュを補正する
+    func refreshUser(appState: AppState) async {
+        guard let userId = appState.userId else { return }
+        do {
+            let user = try await APIService.shared.getUser(userId: userId)
+            appState.updatePlan(user.plan)
+            if let language = user.language {
+                appState.updateRadioLanguage(language)
+            }
+        } catch {
+            // オフライン等でも既存のローカルキャッシュ値で動作を継続する
+        }
+    }
+
+    func updateRadioLanguage(_ language: String, appState: AppState) async {
+        guard let userId = appState.userId else { return }
+        isChangingLanguage = true
+        defer { isChangingLanguage = false }
+        do {
+            let newLanguage = try await APIService.shared.updateRadioLanguage(userId: userId, language: language)
+            appState.updateRadioLanguage(newLanguage)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -210,10 +311,13 @@ struct OnboardingView: View {
         defer { isLoading = false }
 
         do {
-            let user = try await APIService.shared.createUser(email: "", fcmToken: "")
-            appState.signIn(userId: user.userId, plan: user.plan)
+            let user = try await APIService.shared.createUser(
+                email: "", fcmToken: "", language: appState.displayLanguage
+            )
+            appState.signIn(userId: user.userId, plan: user.plan,
+                             radioLanguage: user.language ?? appState.displayLanguage)
         } catch {
-            errorMessage = "サーバーに接続できません: \(error.localizedDescription)"
+            errorMessage = localized("サーバーに接続できません: \(error.localizedDescription)")
         }
     }
 }

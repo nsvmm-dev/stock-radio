@@ -10,13 +10,16 @@ struct StockRadioApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if appState.userId == nil {
-                OnboardingView()
-                    .environmentObject(appState)
-            } else {
-                MainTabView()
-                    .environmentObject(appState)
+            Group {
+                if appState.userId == nil {
+                    OnboardingView()
+                        .environmentObject(appState)
+                } else {
+                    MainTabView()
+                        .environmentObject(appState)
+                }
             }
+            .environment(\.locale, Locale(identifier: appState.displayLanguage))
         }
     }
 }
@@ -27,18 +30,35 @@ struct StockRadioApp: App {
 final class AppState: ObservableObject {
     @Published var userId: String?
     @Published var plan: String = "free"
+    @Published var radioLanguage: String = "ja"
+    @Published var displayLanguage: String {
+        didSet { UserDefaults.standard.set(displayLanguage, forKey: displayLanguageDefaultsKey) }
+    }
 
     init() {
+        displayLanguage = UserDefaults.standard.string(forKey: displayLanguageDefaultsKey) ?? "ja"
         if let user = LocalUser.load() {
             self.userId = user.userId
             self.plan = user.plan
+            self.radioLanguage = user.radioLanguage ?? "ja"
         }
     }
 
-    func signIn(userId: String, plan: String) {
+    func signIn(userId: String, plan: String, radioLanguage: String) {
         self.userId = userId
         self.plan = plan
-        LocalUser(userId: userId, plan: plan).save()
+        self.radioLanguage = radioLanguage
+        LocalUser(userId: userId, plan: plan, radioLanguage: radioLanguage).save()
+    }
+
+    func updatePlan(_ plan: String) {
+        self.plan = plan
+        LocalUser(userId: userId ?? "", plan: plan, radioLanguage: radioLanguage).save()
+    }
+
+    func updateRadioLanguage(_ language: String) {
+        self.radioLanguage = language
+        LocalUser(userId: userId ?? "", plan: plan, radioLanguage: language).save()
     }
 }
 

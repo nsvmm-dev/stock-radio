@@ -110,6 +110,9 @@ def _generate_for_user(user: dict, watchlist_data: list, radio_date: str, market
                         all_news: list, jst_now: datetime):
     user_id = user["userId"]
     plan = user.get("plan", "free")
+    language = user.get("language", "ja")
+    if language not in ("ja", "en"):
+        language = "ja"
 
     # ユーザーウォッチリストに関連するニュースをフィルタ
     relevant_news = _filter_relevant_news(all_news, watchlist_data)
@@ -121,10 +124,11 @@ def _generate_for_user(user: dict, watchlist_data: list, radio_date: str, market
         market_data=market_data,
         watchlist_data=watchlist_data,
         news=relevant_news,
+        language=language,
     )
 
     # 音声生成
-    tts_gen = TTSGenerator()
+    tts_gen = TTSGenerator(language=language)
     audio_bytes = tts_gen.synthesize(script)
 
     # S3 に保存
@@ -145,7 +149,7 @@ def _generate_for_user(user: dict, watchlist_data: list, radio_date: str, market
         "userId": user_id,
         "radioDate": radio_date,
         "s3Key": s3_key,
-        "durationSec": _estimate_duration_sec(script),
+        "durationSec": _estimate_duration_sec(script, language),
         "scriptLength": len(script),
         "stockCount": len(watchlist_data),
         "createdAt": jst_now.isoformat(),
@@ -220,9 +224,10 @@ def _get_watchlist(user_id: str) -> list:
     return resp.get("Items", [])
 
 
-def _estimate_duration_sec(script: str) -> int:
-    # 日本語は約5文字/秒で読まれる
-    return len(script) // 5
+def _estimate_duration_sec(script: str, language: str = "ja") -> int:
+    # 日本語は約5文字/秒、英語は約14文字/秒(スペース込み)で読まれる
+    chars_per_sec = 14 if language == "en" else 5
+    return len(script) // chars_per_sec
 
 
 def _update_stock_prices_table(stock_fetcher: StockFetcher, unique_stock_prices: dict):

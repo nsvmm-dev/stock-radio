@@ -81,6 +81,10 @@ def _route(method, path, query_params, body):
         if len(segments) == 3 and segments[2] == "plan" and method == "PUT":
             return _update_plan(user_id, body)
 
+        # PUT /users/{userId}/language
+        if len(segments) == 3 and segments[2] == "language" and method == "PUT":
+            return _update_language(user_id, body)
+
         # PUT /users/{userId}/fcm-token
         if len(segments) == 3 and segments[2] == "fcm-token" and method == "PUT":
             return _update_fcm_token(user_id, body)
@@ -113,16 +117,21 @@ def _create_user(body: dict):
     table = dynamodb.Table(os.environ["USERS_TABLE"])
     user_id = str(uuid.uuid4())
     now = datetime.now(JST).isoformat()
+    language = body.get("language", "ja")
+    if language not in ("ja", "en"):
+        language = "ja"
 
     table.put_item(Item={
         "userId": user_id,
         "email": body.get("email", ""),
         "plan": "free",
         "fcmToken": body.get("fcmToken", ""),
+        "language": language,
+        "languageChangedAt": now,
         "createdAt": now,
         "updatedAt": now,
     })
-    return _res(201, {"userId": user_id, "plan": "free"})
+    return _res(201, {"userId": user_id, "plan": "free", "language": language})
 
 
 def _get_user(user_id: str):
@@ -156,6 +165,46 @@ def _update_fcm_token(user_id: str, body: dict):
         ExpressionAttributeValues={":t": token, ":now": datetime.now(JST).isoformat()},
     )
     return _res(200, {"message": "updated"})
+
+
+LANGUAGE_CHANGE_COOLDOWN_DAYS = 30
+
+
+def _update_language(user_id: str, body: dict):
+    language = body.get("language")
+    if language not in ("ja", "en"):
+        return _res(400, {"error": "language must be ja / en"})
+
+    table = dynamodb.Table(os.environ["USERS_TABLE"])
+    result = table.get_item(Key={"userId": user_id})
+    if "Item" not in result:
+        return _res(404, {"error": "user not found"})
+    user = result["Item"]
+
+    if user.get("plan", "free") == "free":
+        return _res(403, {"error": "free_plan_locked",
+                           "message": "ラジオ言語の変更には有料プランへのアップグレードが必要です"})
+
+    now = datetime.now(JST)
+    changed_at_str = user.get("languageChangedAt")
+    if changed_at_str:
+        changed_at = datetime.fromisoformat(changed_at_str)
+        elapsed_days = (now - changed_at).days
+        if elapsed_days < LANGUAGE_CHANGE_COOLDOWN_DAYS:
+            next_available = changed_at + timedelta(days=LANGUAGE_CHANGE_COOLDOWN_DAYS)
+            return _res(403, {
+                "error": "cooldown",
+                "message": "ラジオ言語は前回の変更から30日間は再変更できません",
+                "nextAvailableDate": next_available.strftime("%Y-%m-%d"),
+            })
+
+    table.update_item(
+        Key={"userId": user_id},
+        UpdateExpression="SET #lang = :lang, languageChangedAt = :now, updatedAt = :now",
+        ExpressionAttributeNames={"#lang": "language"},
+        ExpressionAttributeValues={":lang": language, ":now": now.isoformat()},
+    )
+    return _res(200, {"language": language})
 
 
 # ── ラジオ ───────────────────────────────────────────────────────────
