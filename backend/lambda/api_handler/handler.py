@@ -127,7 +127,9 @@ def _create_user(body: dict):
         "plan": "free",
         "fcmToken": body.get("fcmToken", ""),
         "language": language,
-        "languageChangedAt": now,
+        # languageChangedAt はここでは設定しない。登録時刻を起点にすると
+        # 有料プランへ切り替えた直後のユーザーが最初の変更すらできなく
+        # なるため、_update_language が実際に変更された時点で初めて記録する。
         "createdAt": now,
         "updatedAt": now,
     })
