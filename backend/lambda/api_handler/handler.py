@@ -59,14 +59,8 @@ def _route(method, path, query_params, body):
     if segments == ["stocks", "search"] and method == "GET":
         return _search_stocks(query_params.get("q", ""), query_params.get("market", ""))
 
-    # GET /stocks/hot
-    if segments == ["stocks", "hot"] and method == "GET":
-        return _get_hot_stocks()
-
     if len(segments) == 4 and segments[0] == "stocks" and method == "GET":
         market, code, action = segments[1], segments[2], segments[3]
-        if action == "quote":
-            return _get_stock_quote(market, code)
         if action == "news":
             return _get_stock_news(market, code, query_params.get("name", ""))
 
@@ -327,34 +321,7 @@ def _load_jp_stock_master() -> list:
     return _jp_stock_master_cache
 
 
-# ── 株価・注目銘柄・ニュース ───────────────────────────────────────────
-
-def _get_hot_stocks():
-    """当日の注目銘柄(米国値上がり/値下がり/出来高上位、日本の人気銘柄)"""
-    result = dynamodb.Table(os.environ["HOT_STOCKS_TABLE"]).scan()
-    by_category = {item["category"]: item.get("items", []) for item in result.get("Items", [])}
-
-    return _res(200, {
-        "usGainers": by_category.get("us_gainers", []),
-        "usLosers": by_category.get("us_losers", []),
-        "usMostActive": by_category.get("us_most_active", []),
-        "jpPopular": by_category.get("jp_popular", []),
-    })
-
-
-def _get_stock_quote(market: str, code: str):
-    """日次バッチでキャッシュされた株価・チャート履歴を取得"""
-    market_code = f"{market.upper()}#{code.upper()}"
-    result = dynamodb.Table(os.environ["STOCK_PRICES_TABLE"]).get_item(
-        Key={"marketCode": market_code}
-    )
-    if "Item" not in result:
-        return _res(404, {"error": "quote not found"})
-
-    item = result["Item"]
-    item["history"] = item.get("history", [])[-30:]  # 直近30件にトリム
-    return _res(200, item)
-
+# ── ニュース ─────────────────────────────────────────────────────────
 
 def _get_stock_news(market: str, code: str, name: str):
     """銘柄名/コードでニュースをライブ取得しフィルタ(RSSはレート制限なし)"""

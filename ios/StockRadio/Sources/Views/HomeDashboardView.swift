@@ -47,7 +47,7 @@ struct HomeDashboardView: View {
                     } else {
                         ForEach(vm.watchlist) { item in
                             NavigationLink(value: StockRef(market: item.market, code: item.stockCode, name: item.stockName)) {
-                                FavoriteStockRowView(item: item, quote: vm.quotes[item.stockCode])
+                                FavoriteStockRowView(item: item)
                             }
                         }
                     }
@@ -102,7 +102,6 @@ struct TodaysRadioRow: View {
 final class HomeDashboardViewModel: ObservableObject {
     @Published var todaysRadio: RadioMeta?
     @Published var watchlist: [WatchlistItem] = []
-    @Published var quotes: [String: StockQuote] = [:]
     @Published var isLoadingRadios = false
     @Published var isLoadingWatchlist = false
     @Published var errorMessage: String?
@@ -130,23 +129,5 @@ final class HomeDashboardViewModel: ObservableObject {
 
         watchlist = await watchlistResult ?? []
         isLoadingWatchlist = false
-
-        await loadQuotes()
-    }
-
-    private func loadQuotes() async {
-        await withTaskGroup(of: (String, StockQuote?).self) { group in
-            for item in watchlist {
-                group.addTask {
-                    let quote = try? await APIService.shared.getStockQuote(market: item.market, code: item.stockCode)
-                    return (item.stockCode, quote)
-                }
-            }
-            for await (code, quote) in group {
-                if let quote {
-                    quotes[code] = quote
-                }
-            }
-        }
     }
 }

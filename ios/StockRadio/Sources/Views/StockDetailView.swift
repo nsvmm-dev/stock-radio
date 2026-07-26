@@ -1,5 +1,4 @@
 import SwiftUI
-import Charts
 
 struct StockDetailView: View {
     let ref: StockRef
@@ -14,7 +13,9 @@ struct StockDetailView: View {
     var body: some View {
         List {
             Section {
-                quoteHeader
+                Text("\(ref.code) · \(ref.market.marketDisplayName)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .listRowSeparator(.hidden)
 
@@ -50,45 +51,6 @@ struct StockDetailView: View {
             await vm.load()
         }
     }
-
-    @ViewBuilder
-    private var quoteHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("\(ref.code) · \(ref.market.marketDisplayName)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            if let quote = vm.quote {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(quote.latestClose, format: .number.precision(.fractionLength(1)))
-                        .font(.title.bold())
-                    Text("\(quote.changePct >= 0 ? "+" : "")\(quote.changePct, specifier: "%.2f")%")
-                        .font(.headline)
-                        .foregroundStyle(quote.changePct >= 0 ? .green : .red)
-                }
-
-                if quote.history.count >= 2 {
-                    Chart(quote.history) { point in
-                        LineMark(x: .value("Date", point.date), y: .value("Close", point.close))
-                            .foregroundStyle(quote.changePct >= 0 ? .green : .red)
-                            .interpolationMethod(.catmullRom)
-                    }
-                    .frame(height: 200)
-                }
-            } else if vm.isLoadingQuote {
-                ProgressView()
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .frame(height: 200)
-            } else {
-                Text("株価データがまだありません")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .frame(height: 100)
-            }
-        }
-        .padding(.vertical, 4)
-    }
 }
 
 struct NewsRowView: View {
@@ -117,9 +79,7 @@ struct NewsRowView: View {
 @MainActor
 final class StockDetailViewModel: ObservableObject {
     let ref: StockRef
-    @Published var quote: StockQuote?
     @Published var news: [NewsItem] = []
-    @Published var isLoadingQuote = false
     @Published var isLoadingNews = false
 
     init(ref: StockRef) {
@@ -127,16 +87,8 @@ final class StockDetailViewModel: ObservableObject {
     }
 
     func load() async {
-        isLoadingQuote = true
         isLoadingNews = true
-
-        async let quoteResult: StockQuote? = try? APIService.shared.getStockQuote(market: ref.market, code: ref.code)
-        async let newsResult: [NewsItem]? = try? APIService.shared.getStockNews(market: ref.market, code: ref.code, name: ref.name)
-
-        quote = await quoteResult
-        isLoadingQuote = false
-
-        news = await newsResult ?? []
+        news = (try? await APIService.shared.getStockNews(market: ref.market, code: ref.code, name: ref.name)) ?? []
         isLoadingNews = false
     }
 }

@@ -7,11 +7,6 @@ struct DiscoverView: View {
     var body: some View {
         NavigationStack {
             List {
-                hotStocksSection(title: localized("米国 値上がり"), stocks: vm.hotStocks?.usGainers)
-                hotStocksSection(title: localized("米国 値下がり"), stocks: vm.hotStocks?.usLosers)
-                hotStocksSection(title: localized("米国 出来高上位"), stocks: vm.hotStocks?.usMostActive)
-                hotStocksSection(title: localized("日本 人気銘柄"), stocks: vm.hotStocks?.jpPopular)
-
                 Section("銘柄を追加") {
                     AddStockRow { code, name, market in
                         Task { await vm.add(code: code, name: name, market: market,
@@ -22,12 +17,6 @@ struct DiscoverView: View {
             .navigationTitle("検索")
             .navigationDestination(for: StockRef.self) { ref in
                 StockDetailView(ref: ref)
-            }
-            .refreshable {
-                await vm.loadHotStocks()
-            }
-            .task {
-                await vm.loadHotStocks()
             }
             .alert("エラー", isPresented: Binding(
                 get: { vm.errorMessage != nil },
@@ -44,19 +33,6 @@ struct DiscoverView: View {
                 Button("OK") { vm.addedStockName = nil }
             } message: {
                 Text("「\(vm.addedStockName ?? "")」をお気に入り銘柄に追加しました。マイページから確認できます。")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func hotStocksSection(title: String, stocks: [HotStock]?) -> some View {
-        if let stocks, !stocks.isEmpty {
-            Section(title) {
-                ForEach(stocks) { stock in
-                    NavigationLink(value: StockRef(market: stock.market, code: stock.code, name: stock.name)) {
-                        HotStockRowView(stock: stock)
-                    }
-                }
             }
         }
     }
@@ -177,17 +153,8 @@ struct AddStockRow: View {
 
 @MainActor
 final class DiscoverViewModel: ObservableObject {
-    @Published var hotStocks: HotStocksResponse?
     @Published var errorMessage: String?
     @Published var addedStockName: String?
-
-    func loadHotStocks() async {
-        do {
-            hotStocks = try await APIService.shared.getHotStocks()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
 
     func add(code: String, name: String, market: String, userId: String) async {
         guard !userId.isEmpty else {

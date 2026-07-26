@@ -48,43 +48,11 @@ struct StockRef: Codable, Identifiable, Hashable {
     var id: String { "\(market)#\(code)" }
 }
 
-struct StockPricePoint: Codable, Identifiable, Hashable {
-    let date: String
-    let close: Double
-    var id: String { date }
-}
-
 struct StockSearchResult: Codable, Identifiable, Hashable {
     let market: String
     let code: String
     let name: String
     var id: String { "\(market)#\(code)" }
-}
-
-struct StockQuote: Codable {
-    let market: String
-    let code: String
-    let name: String
-    let latestClose: Double
-    let changePct: Double
-    let updatedAt: String?
-    let history: [StockPricePoint]
-}
-
-struct HotStock: Codable, Identifiable {
-    let market: String
-    let code: String
-    let name: String
-    let latestClose: Double?
-    let changePct: Double?
-    var id: String { "\(market)#\(code)" }
-}
-
-struct HotStocksResponse: Codable {
-    let usGainers: [HotStock]
-    let usLosers: [HotStock]
-    let usMostActive: [HotStock]
-    let jpPopular: [HotStock]
 }
 
 struct NewsItem: Codable, Identifiable, Hashable {
