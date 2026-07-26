@@ -3,6 +3,7 @@ import os
 import logging
 from collections import Counter
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
@@ -230,6 +231,18 @@ def _estimate_duration_sec(script: str, language: str = "ja") -> int:
     return len(script) // chars_per_sec
 
 
+def _to_dynamo_safe(value):
+    """DynamoDB は Python の float を受け付けない (TypeError) ため、
+    put_item に渡す前に再帰的に Decimal へ変換する。"""
+    if isinstance(value, float):
+        return Decimal(str(value))
+    if isinstance(value, dict):
+        return {k: _to_dynamo_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_to_dynamo_safe(v) for v in value]
+    return value
+
+
 def _update_stock_prices_table(stock_fetcher: StockFetcher, unique_stock_prices: dict):
     """当日ウォッチリストに登場した銘柄ごとに履歴を取得し StockPricesTable を更新"""
     table = dynamodb.Table(os.environ["STOCK_PRICES_TABLE"])
@@ -257,7 +270,7 @@ def _update_stock_prices_table(stock_fetcher: StockFetcher, unique_stock_prices:
         info["latestClose"] = latest["close"]
         info["changePct"] = change_pct
 
-        table.put_item(Item={
+        table.put_item(Item=_to_dynamo_safe({
             "marketCode": market_code,
             "market": market,
             "code": code,
@@ -266,7 +279,7 @@ def _update_stock_prices_table(stock_fetcher: StockFetcher, unique_stock_prices:
             "changePct": change_pct,
             "history": history,
             "updatedAt": now,
-        })
+        }))
 
     logger.info(f"StockPricesTable更新: {len(unique_stock_prices)}銘柄")
 
@@ -285,7 +298,7 @@ def _update_hot_stocks_table(top_movers: dict, jp_code_counter: Counter, unique_
                  "changePct": m["change_pct"]}
                 for m in top_movers.get(us_key, [])
             ]
-            table.put_item(Item={"category": category_key, "items": items, "updatedAt": now})
+            table.put_item(Item=_to_dynamo_safe({"category": category_key, "items": items, "updatedAt": now}))
 
     # 日本株の「人気銘柄」= 全ユーザーのウォッチリストでの登場回数が多い順
     jp_popular = []
@@ -298,7 +311,7 @@ def _update_hot_stocks_table(top_movers: dict, jp_code_counter: Counter, unique_
             "latestClose": info.get("latestClose"), "changePct": info.get("changePct"),
         })
 
-    table.put_item(Item={"category": "jp_popular", "items": jp_popular, "updatedAt": now})
+    table.put_item(Item=_to_dynamo_safe({"category": "jp_popular", "items": jp_popular, "updatedAt": now}))
     logger.info("HotStocksTable更新完了")
 
 
