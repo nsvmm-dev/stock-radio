@@ -15,6 +15,11 @@ struct APIMessageError: LocalizedError {
     var errorDescription: String? { message }
 }
 
+private struct APIErrorResponse: Decodable {
+    let message: String?
+    let nextAvailableDate: String?
+}
+
 final class APIService {
     static let shared = APIService()
     private init() {}
@@ -34,6 +39,13 @@ final class APIService {
         let (data, response) = try await URLSession.shared.data(for: req)
 
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            if let errRes = try? JSONDecoder().decode(APIErrorResponse.self, from: data), let message = errRes.message {
+                var fullMessage = message
+                if let date = errRes.nextAvailableDate {
+                    fullMessage += "\n次回変更可能日: \(date)"
+                }
+                throw APIMessageError(message: fullMessage)
+            }
             throw APIError.serverError(http.statusCode)
         }
 
@@ -88,6 +100,16 @@ final class APIService {
             throw APIMessageError(message: message)
         }
         throw APIError.serverError(http.statusCode)
+    }
+
+    /// ラジオ音声の変更。free プランやクールダウン中は 403 とともにサーバー側の
+    /// メッセージが返るため、request() 経由で APIMessageError として伝える。
+    func updateRadioVoice(userId: String, voice: String) async throws -> String {
+        struct Body: Encodable { let voice: String }
+        struct Res: Decodable { let voice: String }
+        let res: Res = try await request("/users/\(userId)/voice", method: "PUT",
+                                          body: Body(voice: voice))
+        return res.voice
     }
 
     // ── ラジオ ───────────────────────────────────────────────────────

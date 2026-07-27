@@ -106,7 +106,7 @@ def _generate_for_user(user: dict, watchlist_data: list, radio_date: str, market
     )
 
     # 音声生成
-    tts_gen = TTSGenerator(language=language)
+    tts_gen = TTSGenerator(language=language, voice=user.get("radioVoice"))
     audio_bytes = tts_gen.synthesize(script)
 
     # S3 に保存

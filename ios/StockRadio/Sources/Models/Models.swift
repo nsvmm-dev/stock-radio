@@ -8,6 +8,7 @@ struct UserResponse: Codable {
     var email: String?
     var createdAt: String?
     var language: String?
+    var radioVoice: String?
 }
 
 struct RadioMeta: Codable, Identifiable, Hashable {
@@ -119,12 +120,30 @@ extension String {
     }
 }
 
+// ── ラジオ音声 ──────────────────────────────────────────────────────
+
+/// ラジオ言語ごとに選択できるナレーター音声のキー(バックエンドの RADIO_VOICE_OPTIONS と対応)
+let radioVoiceOptions: [String: [String]] = [
+    "ja": ["mizuki", "kazuha"],
+    "en": ["joanna"],
+]
+
+func radioVoiceDisplayName(_ voice: String) -> String {
+    switch voice {
+    case "mizuki": return localized("Mizuki(標準)")
+    case "kazuha": return localized("Kazuha(高品質)")
+    case "joanna": return "Joanna"
+    default: return voice
+    }
+}
+
 // ── ローカルユーザー設定 ────────────────────────────────────────────
 
 struct LocalUser: Codable {
     let userId: String
     var plan: String
     var radioLanguage: String?
+    var radioVoice: String?
 
     static let storageKey = "local_user"
 

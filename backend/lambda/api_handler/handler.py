@@ -79,6 +79,10 @@ def _route(method, path, query_params, body):
         if len(segments) == 3 and segments[2] == "language" and method == "PUT":
             return _update_language(user_id, body)
 
+        # PUT /users/{userId}/voice
+        if len(segments) == 3 and segments[2] == "voice" and method == "PUT":
+            return _update_voice(user_id, body)
+
         # PUT /users/{userId}/fcm-token
         if len(segments) == 3 and segments[2] == "fcm-token" and method == "PUT":
             return _update_fcm_token(user_id, body)
@@ -203,6 +207,63 @@ def _update_language(user_id: str, body: dict):
     return _res(200, {"language": language})
 
 
+VOICE_CHANGE_COOLDOWN_DAYS = 30
+# ラジオ言語ごとに選択できるナレーター音声(tts_generator.RADIO_VOICESと対応)
+RADIO_VOICE_OPTIONS = {
+    "ja": ("mizuki", "kazuha"),
+    "en": ("joanna",),
+}
+
+
+def _update_voice(user_id: str, body: dict):
+    voice = body.get("voice")
+
+    table = dynamodb.Table(os.environ["USERS_TABLE"])
+    result = table.get_item(Key={"userId": user_id})
+    if "Item" not in result:
+        return _res(404, {"error": "user not found"})
+    user = result["Item"]
+    plan = user.get("plan", "free")
+    language = user.get("language", "ja")
+
+    valid_voices = RADIO_VOICE_OPTIONS.get(language, RADIO_VOICE_OPTIONS["ja"])
+    if voice not in valid_voices:
+        return _res(400, {"error": f"voice must be one of {', '.join(valid_voices)}"})
+
+    if plan == "free":
+        return _res(403, {"error": "free_plan_locked",
+                           "message": "ラジオ音声の変更には有料プランへのアップグレードが必要です"})
+
+    now = datetime.now(JST)
+
+    # standard プランのみ30日クールダウンを課す(pro は自由に変更可能)
+    if plan == "standard":
+        changed_at_str = user.get("voiceChangedAt")
+        if changed_at_str:
+            changed_at = datetime.fromisoformat(changed_at_str)
+            elapsed_days = (now - changed_at).days
+            if elapsed_days < VOICE_CHANGE_COOLDOWN_DAYS:
+                next_available = changed_at + timedelta(days=VOICE_CHANGE_COOLDOWN_DAYS)
+                return _res(403, {
+                    "error": "cooldown",
+                    "message": "ラジオ音声は前回の変更から30日間は再変更できません",
+                    "nextAvailableDate": next_available.strftime("%Y-%m-%d"),
+                })
+        table.update_item(
+            Key={"userId": user_id},
+            UpdateExpression="SET radioVoice = :v, voiceChangedAt = :now, updatedAt = :now",
+            ExpressionAttributeValues={":v": voice, ":now": now.isoformat()},
+        )
+        return _res(200, {"voice": voice})
+
+    table.update_item(
+        Key={"userId": user_id},
+        UpdateExpression="SET radioVoice = :v, updatedAt = :now",
+        ExpressionAttributeValues={":v": voice, ":now": now.isoformat()},
+    )
+    return _res(200, {"voice": voice})
+
+
 # ── ラジオ ───────────────────────────────────────────────────────────
 
 def _list_radios(user_id: str):
@@ -237,6 +298,9 @@ def _get_radio(user_id: str, radio_date: str):
 
 # ── ウォッチリスト ────────────────────────────────────────────────────
 
+WATCHLIST_LIMITS = {"free": 3, "standard": 10, "pro": None}  # pro = 無制限
+
+
 def _get_watchlist(user_id: str):
     result = dynamodb.Table(os.environ["WATCHLISTS_TABLE"]).query(
         KeyConditionExpression=Key("userId").eq(user_id)
@@ -249,6 +313,22 @@ def _add_watchlist(user_id: str, body: dict):
     if not code:
         return _res(400, {"error": "stockCode is required"})
 
+    user_result = dynamodb.Table(os.environ["USERS_TABLE"]).get_item(Key={"userId": user_id})
+    if "Item" not in user_result:
+        return _res(404, {"error": "user not found"})
+    plan = user_result["Item"].get("plan", "free")
+
+    watchlist_table = dynamodb.Table(os.environ["WATCHLISTS_TABLE"])
+    existing_items = watchlist_table.query(KeyConditionExpression=Key("userId").eq(user_id)).get("Items", [])
+    already_added = any(i["stockCode"] == code for i in existing_items)
+
+    limit = WATCHLIST_LIMITS.get(plan, 3)
+    if not already_added and limit is not None and len(existing_items) >= limit:
+        return _res(403, {
+            "error": "watchlist_limit_reached",
+            "message": f"お気に入り銘柄は{limit}件までです。プランをアップグレードすると増やせます。",
+        })
+
     item = {
         "userId": user_id,
         "stockCode": code,
@@ -256,7 +336,7 @@ def _add_watchlist(user_id: str, body: dict):
         "market": body.get("market", "JP"),
         "addedAt": datetime.now(JST).isoformat(),
     }
-    dynamodb.Table(os.environ["WATCHLISTS_TABLE"]).put_item(Item=item)
+    watchlist_table.put_item(Item=item)
     return _res(201, item)
 
 

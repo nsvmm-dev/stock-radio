@@ -6,12 +6,20 @@ import boto3
 
 logger = logging.getLogger()
 
-# テスト: Mizuki/Joanna (standard) = 無料枠 5M字/月
-# 本番:   Kazuha/Joanna (neural)   = 高品質、課金発生
-VOICE_MAP = {
-    "ja": {"standard": "Mizuki", "neural": "Kazuha"},
-    "en": {"standard": "Joanna", "neural": "Joanna"},
+# ユーザーがマイページで選択できるナレーター音声。
+# 日本語は Mizuki(standard, 無料枠) / Kazuha(neural, 高品質・課金発生) の2択。
+# 英語は Joanna のみ(選択肢なし)。
+RADIO_VOICES = {
+    "ja": {
+        "mizuki": {"voiceId": "Mizuki", "engine": "standard"},
+        "kazuha": {"voiceId": "Kazuha", "engine": "neural"},
+    },
+    "en": {
+        "joanna": {"voiceId": "Joanna", "engine": "standard"},
+    },
 }
+
+DEFAULT_VOICE = {"ja": "mizuki", "en": "joanna"}
 
 LANGUAGE_CODE_MAP = {
     "ja": "ja-JP",
@@ -27,12 +35,21 @@ POLLY_CHAR_LIMIT = 2900  # Polly 1リクエストあたりの文字数上限
 
 
 class TTSGenerator:
-    def __init__(self, language: str = "ja"):
+    def __init__(self, language: str = "ja", voice: str = None):
         self._polly = boto3.client("polly")
-        engine = os.environ.get("TTS_ENGINE", "standard")
-        self._engine = engine
-        self._language = language if language in VOICE_MAP else "ja"
-        self._voice_id = VOICE_MAP[self._language].get(engine, VOICE_MAP[self._language]["standard"])
+        self._language = language if language in RADIO_VOICES else "ja"
+        voices = RADIO_VOICES[self._language]
+        voice_key = voice if voice in voices else DEFAULT_VOICE[self._language]
+        selected = voices[voice_key]
+
+        # neural音声はTTS_ENGINE=neuralの本番環境でのみ使用する(dev/testでの誤課金を防ぐため、
+        # ユーザーがneural音声を選択していてもTTS_ENGINE=standardの環境ではデフォルト音声にフォールバック)
+        if selected["engine"] == "neural" and os.environ.get("TTS_ENGINE", "standard") != "neural":
+            voice_key = DEFAULT_VOICE[self._language]
+            selected = voices[voice_key]
+
+        self._voice_id = selected["voiceId"]
+        self._engine = selected["engine"]
         self._language_code = LANGUAGE_CODE_MAP[self._language]
 
     def synthesize(self, text: str) -> bytes:

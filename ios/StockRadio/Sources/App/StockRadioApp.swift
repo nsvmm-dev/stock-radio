@@ -31,6 +31,7 @@ final class AppState: ObservableObject {
     @Published var userId: String?
     @Published var plan: String = "free"
     @Published var radioLanguage: String = "ja"
+    @Published var radioVoice: String = "mizuki"
     @Published var displayLanguage: String {
         didSet { UserDefaults.standard.set(displayLanguage, forKey: displayLanguageDefaultsKey) }
     }
@@ -41,24 +42,31 @@ final class AppState: ObservableObject {
             self.userId = user.userId
             self.plan = user.plan
             self.radioLanguage = user.radioLanguage ?? "ja"
+            self.radioVoice = user.radioVoice ?? "mizuki"
         }
     }
 
-    func signIn(userId: String, plan: String, radioLanguage: String) {
+    func signIn(userId: String, plan: String, radioLanguage: String, radioVoice: String = "mizuki") {
         self.userId = userId
         self.plan = plan
         self.radioLanguage = radioLanguage
-        LocalUser(userId: userId, plan: plan, radioLanguage: radioLanguage).save()
+        self.radioVoice = radioVoice
+        LocalUser(userId: userId, plan: plan, radioLanguage: radioLanguage, radioVoice: radioVoice).save()
     }
 
     func updatePlan(_ plan: String) {
         self.plan = plan
-        LocalUser(userId: userId ?? "", plan: plan, radioLanguage: radioLanguage).save()
+        LocalUser(userId: userId ?? "", plan: plan, radioLanguage: radioLanguage, radioVoice: radioVoice).save()
     }
 
     func updateRadioLanguage(_ language: String) {
         self.radioLanguage = language
-        LocalUser(userId: userId ?? "", plan: plan, radioLanguage: language).save()
+        LocalUser(userId: userId ?? "", plan: plan, radioLanguage: language, radioVoice: radioVoice).save()
+    }
+
+    func updateRadioVoice(_ voice: String) {
+        self.radioVoice = voice
+        LocalUser(userId: userId ?? "", plan: plan, radioLanguage: radioLanguage, radioVoice: voice).save()
     }
 }
 

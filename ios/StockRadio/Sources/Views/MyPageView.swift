@@ -5,6 +5,7 @@ struct MyPageView: View {
     @StateObject private var vm = MyPageViewModel()
     @State private var selectedMarket = "US"
     @State private var pendingRadioLanguage: String?
+    @State private var pendingRadioVoice: String?
 
     private let planOptions: [(String, String, String)] = [
         ("free",     localized("フリー"),       localized("1日間保存・広告あり")),
@@ -89,6 +90,52 @@ struct MyPageView: View {
                     Text("ラジオ言語")
                 }
 
+                Section {
+                    let voiceOptions = radioVoiceOptions[appState.radioLanguage] ?? radioVoiceOptions["ja"]!
+                    if appState.plan == "free" {
+                        LabeledContent("ラジオ音声") {
+                            Text(radioVoiceDisplayName(appState.radioVoice))
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("有料プランにアップグレードすると変更できます")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else if voiceOptions.count <= 1 {
+                        LabeledContent("ラジオ音声") {
+                            Text(radioVoiceDisplayName(voiceOptions.first ?? appState.radioVoice))
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Picker("ラジオ音声", selection: Binding(
+                            get: { appState.radioVoice },
+                            set: { newValue in
+                                if newValue != appState.radioVoice {
+                                    pendingRadioVoice = newValue
+                                }
+                            }
+                        )) {
+                            ForEach(voiceOptions, id: \.self) { voice in
+                                Text(radioVoiceDisplayName(voice)).tag(voice)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .disabled(vm.isChangingVoice)
+
+                        if vm.isChangingVoice {
+                            ProgressView()
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        }
+
+                        Text(appState.plan == "standard"
+                             ? "変更は翌日の放送から反映されます。一度変更すると30日間は再変更できません。"
+                             : "変更は翌日の放送から反映されます。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("ラジオ音声")
+                }
+
                 Section("お気に入り銘柄") {
                     Picker("市場", selection: $selectedMarket) {
                         Text("米国株").tag("US")
@@ -147,6 +194,28 @@ struct MyPageView: View {
             } message: {
                 Text("変更は翌日の放送から反映されます。一度変更すると30日間は再変更できません。")
             }
+            .confirmationDialog(
+                "ラジオ音声を変更しますか？",
+                isPresented: Binding(
+                    get: { pendingRadioVoice != nil },
+                    set: { if !$0 { pendingRadioVoice = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("変更する") {
+                    if let voice = pendingRadioVoice {
+                        Task { await vm.updateRadioVoice(voice, appState: appState) }
+                    }
+                    pendingRadioVoice = nil
+                }
+                Button("キャンセル", role: .cancel) {
+                    pendingRadioVoice = nil
+                }
+            } message: {
+                Text(appState.plan == "standard"
+                     ? "変更は翌日の放送から反映されます。一度変更すると30日間は再変更できません。"
+                     : "変更は翌日の放送から反映されます。")
+            }
             .alert("エラー", isPresented: Binding(
                 get: { vm.errorMessage != nil },
                 set: { if !$0 { vm.errorMessage = nil } }
@@ -172,6 +241,7 @@ final class MyPageViewModel: ObservableObject {
     @Published var watchlist: [WatchlistItem] = []
     @Published var isLoading = false
     @Published var isChangingLanguage = false
+    @Published var isChangingVoice = false
     @Published var errorMessage: String?
 
     func loadWatchlist(userId: String) async {
@@ -194,6 +264,9 @@ final class MyPageViewModel: ObservableObject {
             if let language = user.language {
                 appState.updateRadioLanguage(language)
             }
+            if let voice = user.radioVoice {
+                appState.updateRadioVoice(voice)
+            }
         } catch {
             // オフライン等でも既存のローカルキャッシュ値で動作を継続する
         }
@@ -206,6 +279,18 @@ final class MyPageViewModel: ObservableObject {
         do {
             let newLanguage = try await APIService.shared.updateRadioLanguage(userId: userId, language: language)
             appState.updateRadioLanguage(newLanguage)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateRadioVoice(_ voice: String, appState: AppState) async {
+        guard let userId = appState.userId else { return }
+        isChangingVoice = true
+        defer { isChangingVoice = false }
+        do {
+            let newVoice = try await APIService.shared.updateRadioVoice(userId: userId, voice: voice)
+            appState.updateRadioVoice(newVoice)
         } catch {
             errorMessage = error.localizedDescription
         }
