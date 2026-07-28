@@ -45,6 +45,7 @@ struct HomeDashboardView: View {
                             systemImage: "star",
                             description: Text("「検索」タブから銘柄を追加できます")
                         )
+                        .foregroundStyle(theme.primaryText, theme.secondaryText)
                     } else {
                         ForEach(vm.watchlist) { item in
                             NavigationLink(value: StockRef(market: item.market, code: item.stockCode, name: item.stockName)) {

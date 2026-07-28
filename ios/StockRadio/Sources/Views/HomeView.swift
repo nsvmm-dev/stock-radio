@@ -19,6 +19,7 @@ struct RadioHistoryListView: View {
                     systemImage: "radio",
                     description: Text("毎朝7時に最新のラジオが届きます")
                 )
+                .foregroundStyle(theme.primaryText, theme.secondaryText)
             } else {
                 ForEach(vm.radios) { radio in
                     NavigationLink(value: radio) {
