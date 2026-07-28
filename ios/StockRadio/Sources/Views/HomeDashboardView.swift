@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeDashboardView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.appTheme) private var theme
     @StateObject private var vm = HomeDashboardViewModel()
 
     var body: some View {
@@ -20,7 +21,7 @@ struct HomeDashboardView: View {
                     } else {
                         Text("今日のラジオはまだ届いていません")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                     }
                 } header: {
                     HStack {
@@ -54,7 +55,10 @@ struct HomeDashboardView: View {
                 }
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(theme.background.ignoresSafeArea(edges: .bottom))
             .navigationTitle("株価ラジオ")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: StockRef.self) { ref in
                 StockDetailView(ref: ref)
             }
@@ -69,20 +73,22 @@ struct HomeDashboardView: View {
 }
 
 struct TodaysRadioRow: View {
+    @Environment(\.appTheme) private var theme
     let radio: RadioMeta
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "play.circle.fill")
                 .font(.largeTitle)
-                .foregroundStyle(.blue)
+                .foregroundStyle(theme.accent)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("今日のラジオを聴く")
                     .font(.headline)
+                    .foregroundStyle(theme.primaryText)
                 Text(durationText)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
             }
 
             Spacer()

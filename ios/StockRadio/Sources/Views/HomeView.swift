@@ -4,6 +4,7 @@ import SwiftUI
 
 struct RadioHistoryListView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.appTheme) private var theme
     @StateObject private var vm = HomeViewModel()
 
     var body: some View {
@@ -27,7 +28,10 @@ struct RadioHistoryListView: View {
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(theme.background.ignoresSafeArea())
         .navigationTitle("ラジオ履歴")
+        .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: RadioMeta.self) { radio in
             RadioPlayerView(radio: radio)
         }
@@ -41,24 +45,26 @@ struct RadioHistoryListView: View {
 }
 
 struct RadioRowView: View {
+    @Environment(\.appTheme) private var theme
     let radio: RadioMeta
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "waveform.circle.fill")
                 .font(.largeTitle)
-                .foregroundStyle(.blue)
+                .foregroundStyle(theme.accent)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(radio.radioDate)
                     .font(.headline)
+                    .foregroundStyle(theme.primaryText)
                 Text(durationText)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                 if let count = radio.stockCount, count > 0 {
                     Text("\(count) " + localized("銘柄"))
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
 

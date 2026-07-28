@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct StockDetailView: View {
+    @Environment(\.appTheme) private var theme
     let ref: StockRef
     @StateObject private var vm: StockDetailViewModel
     @State private var selectedNews: NewsItem?
@@ -15,7 +16,7 @@ struct StockDetailView: View {
             Section {
                 Text("\(ref.code) · \(ref.market.marketDisplayName)")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
             }
             .listRowSeparator(.hidden)
 
@@ -26,7 +27,7 @@ struct StockDetailView: View {
                 } else if vm.news.isEmpty {
                     Text("関連ニュースが見つかりませんでした")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                 } else {
                     ForEach(vm.news) { item in
                         Button {
@@ -40,6 +41,8 @@ struct StockDetailView: View {
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(theme.background.ignoresSafeArea())
         .navigationTitle(ref.name)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $selectedNews) { news in
@@ -54,13 +57,14 @@ struct StockDetailView: View {
 }
 
 struct NewsRowView: View {
+    @Environment(\.appTheme) private var theme
     let item: NewsItem
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(item.title)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(.primary)
+                .foregroundStyle(theme.primaryText)
                 .lineLimit(2)
             HStack {
                 Text(item.source)
@@ -68,7 +72,7 @@ struct NewsRowView: View {
                 Text(item.publishedAt.prefix(10))
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(theme.secondaryText)
         }
         .padding(.vertical, 2)
     }

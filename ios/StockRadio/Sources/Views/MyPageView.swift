@@ -4,6 +4,7 @@ import AuthenticationServices
 
 struct MyPageView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.appTheme) private var theme
     @StateObject private var vm = MyPageViewModel()
     @StateObject private var purchaseService = PurchaseService()
     @State private var selectedMarket = "US"
@@ -20,12 +21,21 @@ struct MyPageView: View {
                     LabeledContent("ユーザーID") {
                         Text(appState.userId ?? localized("未設定"))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                     }
                     LabeledContent("現在のプラン") {
                         Text(Plan(rawValue: appState.plan)?.displayName ?? appState.plan)
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(theme.accent)
                     }
+                }
+
+                Section("外観") {
+                    Picker("外観", selection: $appState.uiTheme) {
+                        ForEach(AppTheme.allCases, id: \.self) { t in
+                            Text(t.displayName).tag(t)
+                        }
+                    }
+                    .pickerStyle(.segmented)
                 }
 
                 Section {
@@ -76,11 +86,11 @@ struct MyPageView: View {
                     if appState.plan == "free" {
                         LabeledContent("ラジオ言語") {
                             Text(appState.radioLanguage == "en" ? "English" : "日本語")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(theme.secondaryText)
                         }
                         Text("有料プランにアップグレードすると変更できます")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                     } else {
                         Picker("ラジオ言語", selection: Binding(
                             get: { appState.radioLanguage },
@@ -103,7 +113,7 @@ struct MyPageView: View {
 
                         Text("変更は翌日の放送から反映されます。一度変更すると30日間は再変更できません。")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                     }
                 } header: {
                     Text("ラジオ言語")
@@ -112,12 +122,12 @@ struct MyPageView: View {
                 Section {
                     LabeledContent("ラジオ音声") {
                         Text(Plan(rawValue: appState.plan)?.voiceQualityText ?? "")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                     }
                     if appState.plan == "free" {
                         Text("有料プランでは高品質な音声(Neural)が自動的に使われます")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                     }
                 } header: {
                     Text("ラジオ音声")
@@ -136,7 +146,7 @@ struct MyPageView: View {
                     } else if filteredWatchlist.isEmpty {
                         Text("この市場のお気に入り銘柄はありません")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                     } else {
                         ForEach(filteredWatchlist) { item in
                             NavigationLink(value: StockRef(market: item.market, code: item.stockCode, name: item.stockName)) {
@@ -153,7 +163,10 @@ struct MyPageView: View {
                     Link("プライバシーポリシー", destination: URL(string: "https://example.com/privacy")!)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(theme.background.ignoresSafeArea())
             .navigationTitle("マイページ")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: StockRef.self) { ref in
                 StockDetailView(ref: ref)
             }
@@ -277,6 +290,7 @@ final class MyPageViewModel: ObservableObject {
 }
 
 struct PlanRow: View {
+    @Environment(\.appTheme) private var theme
     let planValue: String
     let planName: String
     let description: String
@@ -298,15 +312,15 @@ struct PlanRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(planName)
                     .font(.headline)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(theme.primaryText)
                 Text(description)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
             }
             Spacer()
             if isCurrentPlan {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(theme.accent)
             }
         }
     }
@@ -316,6 +330,7 @@ struct PlanRow: View {
 
 struct OnboardingView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.appTheme) private var theme
     @State private var isLoading = false
     @State private var errorMessage: String?
 
@@ -332,7 +347,7 @@ struct OnboardingView: View {
                     .font(.largeTitle.bold())
                 Text("毎朝7時、あなたの銘柄の\n最新情報をラジオでお届け")
                     .font(.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                     .multilineTextAlignment(.center)
             }
 

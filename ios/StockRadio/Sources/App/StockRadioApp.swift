@@ -21,9 +21,14 @@ struct StockRadioApp: App {
                 }
             }
             .environment(\.locale, Locale(identifier: appState.displayLanguage))
+            .environment(\.appTheme, appState.uiTheme)
+            .tint(appState.uiTheme.accent)
+            .preferredColorScheme(appState.uiTheme.colorScheme)
         }
     }
 }
+
+let uiThemeDefaultsKey = "ui_theme"
 
 // ── アプリ全体の状態 ────────────────────────────────────────────────
 
@@ -35,9 +40,13 @@ final class AppState: ObservableObject {
     @Published var displayLanguage: String {
         didSet { UserDefaults.standard.set(displayLanguage, forKey: displayLanguageDefaultsKey) }
     }
+    @Published var uiTheme: AppTheme {
+        didSet { UserDefaults.standard.set(uiTheme.rawValue, forKey: uiThemeDefaultsKey) }
+    }
 
     init() {
         displayLanguage = UserDefaults.standard.string(forKey: displayLanguageDefaultsKey) ?? "ja"
+        uiTheme = AppTheme(rawValue: UserDefaults.standard.string(forKey: uiThemeDefaultsKey) ?? "") ?? .standard
         if let user = LocalUser.load() {
             self.userId = user.userId
             self.plan = user.plan
