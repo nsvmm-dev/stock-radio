@@ -54,14 +54,26 @@ final class APIService {
 
     // ── ユーザー ────────────────────────────────────────────────────
 
-    func createUser(email: String, fcmToken: String, language: String) async throws -> UserResponse {
-        struct Body: Encodable { let email: String; let fcmToken: String; let language: String }
-        return try await request("/users", method: "POST",
-                                  body: Body(email: email, fcmToken: fcmToken, language: language))
+    /// Sign in with Apple の identityToken をバックエンドへ送信し、ログイン/新規登録する。
+    /// email は Apple から初回サインイン時にのみ渡される。
+    func signInWithApple(identityToken: String, email: String?, language: String) async throws -> UserResponse {
+        struct Body: Encodable { let identityToken: String; let email: String?; let language: String }
+        return try await request("/auth/apple", method: "POST",
+                                  body: Body(identityToken: identityToken, email: email, language: language))
     }
 
     func getUser(userId: String) async throws -> UserResponse {
         return try await request("/users/\(userId)")
+    }
+
+    /// StoreKit 2 で検証済みのtransaction情報をバックエンドへ反映する。
+    /// productId が nil の場合はサブスクリプションなし(解約・期限切れ)としてfreeに降格する。
+    func updateSubscription(userId: String, productId: String?, transactionId: String?, expiresAt: String?) async throws -> String {
+        struct Body: Encodable { let productId: String?; let transactionId: String?; let expiresAt: String? }
+        struct Res: Decodable { let plan: String }
+        let res: Res = try await request("/users/\(userId)/subscription", method: "PUT",
+                                          body: Body(productId: productId, transactionId: transactionId, expiresAt: expiresAt))
+        return res.plan
     }
 
     func updateFCMToken(userId: String, token: String) async throws {

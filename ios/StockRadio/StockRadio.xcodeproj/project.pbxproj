@@ -22,6 +22,7 @@
 		BB198F09A6A83008B74E14A4 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C4F263F06F49E8FC837CDCF /* Models.swift */; };
 		BCA39E04B180709766D50262 /* StockRadioApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE7E0C7684694743292116DA /* StockRadioApp.swift */; };
 		D319D9773B6700418DA86ABE /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81BCC2CDADC11F27968B7E4F /* DiscoverView.swift */; };
+		E5020EB6B74F86460F752982 /* PurchaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1050B7AEA178026E44862AF4 /* PurchaseService.swift */; };
 		E95CEDD50BA780D66CEA9F9A /* HomeDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7140F1C99534CDBE7E72A26 /* HomeDashboardView.swift */; };
 		F79E657CC000BA7134013484 /* MyPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FBE8D83BDFF486A1FCCA06A /* MyPageView.swift */; };
 /* End PBXBuildFile section */
@@ -29,6 +30,7 @@
 /* Begin PBXFileReference section */
 		016BCCE2C7978A7EBBC5327B /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		0D75DCEB44E66E43A0336963 /* SafariView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariView.swift; sourceTree = "<group>"; };
+		1050B7AEA178026E44862AF4 /* PurchaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseService.swift; sourceTree = "<group>"; };
 		2FBE8D83BDFF486A1FCCA06A /* MyPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyPageView.swift; sourceTree = "<group>"; };
 		30CE4F84C565F12AC8287609 /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
 		4B1BD54BFF6CE5A971548E25 /* AudioPlayerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerService.swift; sourceTree = "<group>"; };
@@ -81,6 +83,7 @@
 			children = (
 				30CE4F84C565F12AC8287609 /* APIService.swift */,
 				4B1BD54BFF6CE5A971548E25 /* AudioPlayerService.swift */,
+				1050B7AEA178026E44862AF4 /* PurchaseService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -232,6 +235,7 @@
 				2299E844026825F4845D08E1 /* MainTabView.swift in Sources */,
 				BB198F09A6A83008B74E14A4 /* Models.swift in Sources */,
 				F79E657CC000BA7134013484 /* MyPageView.swift in Sources */,
+				E5020EB6B74F86460F752982 /* PurchaseService.swift in Sources */,
 				465D138B9CF98E70B29E3A25 /* RadioPlayerView.swift in Sources */,
 				115A792FA156B3F4C5B97DCB /* SafariView.swift in Sources */,
 				87FD36E032B8F62BDDA89970 /* StockDetailView.swift in Sources */,

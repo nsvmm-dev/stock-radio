@@ -36,6 +36,11 @@ targets:
           - audio
           - fetch
           - remote-notification
+    entitlements:
+      path: StockRadio.entitlements
+      properties:
+        com.apple.developer.applesignin:
+          - Default
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.stockradio.app
@@ -45,3 +50,4 @@ targets:
         TARGETED_DEVICE_FAMILY: 1
     scheme:
       testTargets: []
+      storeKitConfiguration: Products.storekit

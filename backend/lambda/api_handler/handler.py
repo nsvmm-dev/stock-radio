@@ -1,7 +1,6 @@
 import json
 import os
 import logging
-import uuid
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
@@ -9,6 +8,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 from news_fetcher import NewsFetcher
+from apple_auth import verify_apple_identity_token, AppleTokenError
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -51,9 +51,9 @@ def _route(method, path, query_params, body):
     # userId 等は入らない（"proxy" キーのみ）。path を自前で分解する。
     segments = [s for s in path.split("/") if s]
 
-    # POST /users
-    if segments == ["users"] and method == "POST":
-        return _create_user(body)
+    # POST /auth/apple
+    if segments == ["auth", "apple"] and method == "POST":
+        return _sign_in_with_apple(body)
 
     # GET /stocks/search?q=xxx&market=JP|US
     if segments == ["stocks", "search"] and method == "GET":
@@ -71,9 +71,9 @@ def _route(method, path, query_params, body):
         if len(segments) == 2 and method == "GET":
             return _get_user(user_id)
 
-        # PUT /users/{userId}/plan
-        if len(segments) == 3 and segments[2] == "plan" and method == "PUT":
-            return _update_plan(user_id, body)
+        # PUT /users/{userId}/subscription
+        if len(segments) == 3 and segments[2] == "subscription" and method == "PUT":
+            return _update_subscription(user_id, body)
 
         # PUT /users/{userId}/language
         if len(segments) == 3 and segments[2] == "language" and method == "PUT":
@@ -107,27 +107,48 @@ def _route(method, path, query_params, body):
 
 # ── ユーザー ─────────────────────────────────────────────────────────
 
-def _create_user(body: dict):
+APPLE_BUNDLE_ID = os.environ.get("APPLE_BUNDLE_ID", "com.stockradio.app")
+
+
+def _sign_in_with_apple(body: dict):
+    identity_token = body.get("identityToken")
+    if not identity_token:
+        return _res(400, {"error": "identityToken is required"})
+
+    try:
+        claims = verify_apple_identity_token(identity_token, APPLE_BUNDLE_ID)
+    except AppleTokenError as e:
+        logger.warning(f"Apple identityToken検証失敗: {e}")
+        return _res(401, {"error": "invalid_token", "message": str(e)})
+
+    user_id = claims["sub"]
     table = dynamodb.Table(os.environ["USERS_TABLE"])
-    user_id = str(uuid.uuid4())
-    now = datetime.now(JST).isoformat()
+    result = table.get_item(Key={"userId": user_id})
+
+    if "Item" in result:
+        # 既存ユーザー: そのままログイン
+        item = result["Item"]
+        item.pop("fcmToken", None)
+        return _res(200, item)
+
+    # 新規ユーザー: emailはAppleから初回サインイン時のみ渡される
     language = body.get("language", "ja")
     if language not in ("ja", "en"):
         language = "ja"
-
-    table.put_item(Item={
+    now = datetime.now(JST).isoformat()
+    item = {
         "userId": user_id,
-        "email": body.get("email", ""),
+        "email": body.get("email") or claims.get("email", ""),
         "plan": "free",
-        "fcmToken": body.get("fcmToken", ""),
         "language": language,
         # languageChangedAt はここでは設定しない。登録時刻を起点にすると
         # 有料プランへ切り替えた直後のユーザーが最初の変更すらできなく
         # なるため、_update_language が実際に変更された時点で初めて記録する。
         "createdAt": now,
         "updatedAt": now,
-    })
-    return _res(201, {"userId": user_id, "plan": "free", "language": language})
+    }
+    table.put_item(Item=item)
+    return _res(201, item)
 
 
 def _get_user(user_id: str):
@@ -139,16 +160,43 @@ def _get_user(user_id: str):
     return _res(200, item)
 
 
-def _update_plan(user_id: str, body: dict):
-    plan = body.get("plan")
-    if plan not in ("free", "standard", "pro"):
-        return _res(400, {"error": "plan must be free / standard / pro"})
+# StoreKit の productId -> プランの対応表
+PRODUCT_PLAN_MAP = {
+    "com.stockradio.app.standard.monthly": "standard",
+    "com.stockradio.app.pro.monthly": "pro",
+}
+
+
+def _update_subscription(user_id: str, body: dict):
+    """
+    StoreKit 2 が端末上で署名検証済みのtransaction情報をアプリから受け取り、
+    プランに反映する。productIdが無い場合は有効なサブスクリプションが
+    存在しない(期限切れ・解約)とみなしfreeへ降格する。
+    サーバー側での独立したApple App Store Server API検証は今回のスコープ外
+    (将来 App Store Server Notifications V2 で強化する余地あり)。
+    """
+    product_id = body.get("productId")
+    if product_id:
+        plan = PRODUCT_PLAN_MAP.get(product_id)
+        if not plan:
+            return _res(400, {"error": f"unknown productId: {product_id}"})
+    else:
+        plan = "free"
 
     dynamodb.Table(os.environ["USERS_TABLE"]).update_item(
         Key={"userId": user_id},
-        UpdateExpression="SET #plan = :plan, updatedAt = :now",
+        UpdateExpression=(
+            "SET #plan = :plan, subscriptionProductId = :pid, "
+            "originalTransactionId = :tid, subscriptionExpiresAt = :exp, updatedAt = :now"
+        ),
         ExpressionAttributeNames={"#plan": "plan"},
-        ExpressionAttributeValues={":plan": plan, ":now": datetime.now(JST).isoformat()},
+        ExpressionAttributeValues={
+            ":plan": plan,
+            ":pid": product_id or "",
+            ":tid": body.get("transactionId", ""),
+            ":exp": body.get("expiresAt", ""),
+            ":now": datetime.now(JST).isoformat(),
+        },
     )
     return _res(200, {"plan": plan})
 

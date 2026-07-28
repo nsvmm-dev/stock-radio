@@ -1,0 +1,81 @@
+{
+  "identifier" : "9E0A4C0F-2032-49CD-8C2A-9FBC11BF6EF7",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : {
+    "_applicationInternalID" : "0",
+    "_developerTeamID" : "0",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 0,
+    "_locale" : "ja_JP",
+    "_storefront" : "JPN",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "A1853E78-AAEA-4900-ABF4-95743D890721",
+      "localizations" : [],
+      "name" : "StockRadio Plans",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "480",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "71E27A25-6A42-4F46-B5BE-51FE58D27697",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "1ヶ月保存・広告なし",
+              "displayName" : "スタンダード",
+              "locale" : "ja"
+            },
+            {
+              "description" : "1-month retention, no ads",
+              "displayName" : "Standard",
+              "locale" : "en"
+            }
+          ],
+          "productID" : "com.stockradio.app.standard.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Standard Monthly",
+          "subscriptionGroupID" : "A1853E78-AAEA-4900-ABF4-95743D890721",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "980",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "AD285706-5A5B-40DB-BEAC-CB3A23E88915",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "無制限保存・全機能",
+              "displayName" : "プロ",
+              "locale" : "ja"
+            },
+            {
+              "description" : "Unlimited retention, all features",
+              "displayName" : "Pro",
+              "locale" : "en"
+            }
+          ],
+          "productID" : "com.stockradio.app.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro Monthly",
+          "subscriptionGroupID" : "A1853E78-AAEA-4900-ABF4-95743D890721",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

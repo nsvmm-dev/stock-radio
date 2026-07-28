@@ -1,16 +1,13 @@
 import SwiftUI
+import StoreKit
+import AuthenticationServices
 
 struct MyPageView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = MyPageViewModel()
+    @StateObject private var purchaseService = PurchaseService()
     @State private var selectedMarket = "US"
     @State private var pendingRadioLanguage: String?
-
-    private let planOptions: [(String, String, String)] = [
-        ("free",     localized("フリー"),       localized("1日間保存・広告あり")),
-        ("standard", localized("スタンダード"), localized("1ヶ月保存・広告なし")),
-        ("pro",      localized("プロ"),         localized("無制限保存・全機能")),
-    ]
 
     private var filteredWatchlist: [WatchlistItem] {
         vm.watchlist.filter { $0.market == selectedMarket }
@@ -31,17 +28,40 @@ struct MyPageView: View {
                     }
                 }
 
-                Section("プランを変更") {
-                    ForEach(planOptions, id: \.0) { value, name, desc in
+                Section {
+                    PlanRow(
+                        planValue: "free",
+                        planName: localized("フリー"),
+                        description: localized("1日間保存・広告あり"),
+                        isCurrentPlan: appState.plan == "free",
+                        onSelect: nil
+                    )
+
+                    ForEach(purchaseService.products) { product in
                         PlanRow(
-                            planValue: value,
-                            planName: name,
-                            description: desc,
-                            isCurrentPlan: appState.plan == value
+                            planValue: product.id,
+                            planName: product.displayName,
+                            description: "\(product.displayPrice) / \(localized("月"))",
+                            isCurrentPlan: appState.plan == PurchaseService.planName(for: product.id)
                         ) {
-                            Task { await changePlan(to: value) }
+                            Task { await purchase(product) }
                         }
                     }
+
+                    if purchaseService.isLoading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+
+                    Button {
+                        Task { await restore() }
+                    } label: {
+                        Text("購入を復元")
+                    }
+                } header: {
+                    Text("プランを変更")
+                } footer: {
+                    Text("フリーへの変更(解約)はiPhoneの設定 > Apple ID > サブスクリプション から行えます")
                 }
 
                 Section("表示言語") {
@@ -140,6 +160,13 @@ struct MyPageView: View {
             .task {
                 await vm.loadWatchlist(userId: appState.userId ?? "")
                 await vm.refreshUser(appState: appState)
+
+                purchaseService.userId = appState.userId
+                await purchaseService.loadProducts()
+                if let userId = appState.userId,
+                   let plan = await purchaseService.syncCurrentEntitlement(userId: userId) {
+                    appState.updatePlan(plan)
+                }
             }
             .confirmationDialog(
                 "ラジオ言語を変更しますか？",
@@ -169,15 +196,29 @@ struct MyPageView: View {
             } message: {
                 Text(vm.errorMessage ?? "")
             }
+            .alert("エラー", isPresented: Binding(
+                get: { purchaseService.errorMessage != nil },
+                set: { if !$0 { purchaseService.errorMessage = nil } }
+            )) {
+                Button("OK") { purchaseService.errorMessage = nil }
+            } message: {
+                Text(purchaseService.errorMessage ?? "")
+            }
         }
     }
 
-    private func changePlan(to plan: String) async {
-        guard appState.userId != nil else { return }
-        struct PlanBody: Encodable { let plan: String }
-        // TODO: APIService に updatePlan を追加して呼び出す
-        // 現状はローカル状態のみ更新
-        appState.updatePlan(plan)
+    private func purchase(_ product: Product) async {
+        guard let userId = appState.userId else { return }
+        if let plan = await purchaseService.purchase(product, userId: userId) {
+            appState.updatePlan(plan)
+        }
+    }
+
+    private func restore() async {
+        guard let userId = appState.userId else { return }
+        if let plan = await purchaseService.restorePurchases(userId: userId) {
+            appState.updatePlan(plan)
+        }
     }
 }
 
@@ -240,24 +281,32 @@ struct PlanRow: View {
     let planName: String
     let description: String
     let isCurrentPlan: Bool
-    let onSelect: () -> Void
+    var onSelect: (() -> Void)?
 
     var body: some View {
-        Button(action: onSelect) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(planName)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text(description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if isCurrentPlan {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.blue)
-                }
+        Group {
+            if let onSelect {
+                Button(action: onSelect) { rowContent }
+            } else {
+                rowContent
+            }
+        }
+    }
+
+    private var rowContent: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(planName)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Text(description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if isCurrentPlan {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.blue)
             }
         }
     }
@@ -289,26 +338,21 @@ struct OnboardingView: View {
 
             Spacer()
 
-            Button {
-                Task { await startApp() }
-            } label: {
-                Group {
-                    if isLoading {
-                        ProgressView()
-                    } else {
-                        Text("はじめる")
-                            .font(.headline)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(.blue)
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            SignInWithAppleButton(.signIn) { request in
+                request.requestedScopes = [.fullName, .email]
+            } onCompletion: { result in
+                Task { await handle(result: result) }
             }
-            .disabled(isLoading)
+            .signInWithAppleButtonStyle(.black)
+            .frame(height: 50)
             .padding(.horizontal, 32)
             .padding(.bottom, 48)
+            .disabled(isLoading)
+            .overlay {
+                if isLoading {
+                    ProgressView()
+                }
+            }
         }
         .alert("エラー", isPresented: Binding(
             get: { errorMessage != nil },
@@ -320,13 +364,30 @@ struct OnboardingView: View {
         }
     }
 
-    private func startApp() async {
+    private func handle(result: Result<ASAuthorization, Error>) async {
+        switch result {
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = credential.identityToken,
+                  let identityToken = String(data: tokenData, encoding: .utf8) else {
+                errorMessage = localized("サインインに失敗しました")
+                return
+            }
+            await signIn(identityToken: identityToken, email: credential.email)
+        case .failure(let error):
+            if (error as? ASAuthorizationError)?.code != .canceled {
+                errorMessage = localized("サインインに失敗しました: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func signIn(identityToken: String, email: String?) async {
         isLoading = true
         defer { isLoading = false }
 
         do {
-            let user = try await APIService.shared.createUser(
-                email: "", fcmToken: "", language: appState.displayLanguage
+            let user = try await APIService.shared.signInWithApple(
+                identityToken: identityToken, email: email, language: appState.displayLanguage
             )
             appState.signIn(userId: user.userId, plan: user.plan,
                              radioLanguage: user.language ?? appState.displayLanguage)
