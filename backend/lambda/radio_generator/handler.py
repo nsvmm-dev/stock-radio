@@ -92,8 +92,8 @@ def _generate_for_user(user: dict, watchlist_data: list, radio_date: str, market
     if language not in ("ja", "en"):
         language = "ja"
 
-    # ユーザーウォッチリストに関連するニュースをフィルタ
-    relevant_news = _filter_relevant_news(all_news, watchlist_data)
+    # ウォッチリスト銘柄ごとの関連ニュース・決算情報、および日米それぞれの市場ニュースに分類
+    news_bundle = _organize_news(all_news, watchlist_data)
 
     # 台本生成
     script_gen = ScriptGenerator()
@@ -101,7 +101,7 @@ def _generate_for_user(user: dict, watchlist_data: list, radio_date: str, market
         radio_date=radio_date,
         market_data=market_data,
         watchlist_data=watchlist_data,
-        news=relevant_news,
+        news_bundle=news_bundle,
         language=language,
     )
 
@@ -170,19 +170,71 @@ def _fetch_watchlist_data(watchlist: list, stock_fetcher: StockFetcher, date: st
     return result
 
 
-def _filter_relevant_news(all_news: list, watchlist_data: list) -> list:
-    names = {s.get("name", "") for s in watchlist_data}
-    codes = {s.get("code", "") for s in watchlist_data}
-    relevant, general = [], []
+EARNINGS_KEYWORDS = (
+    "決算", "純利益", "営業利益", "最終利益", "最終赤字", "最高益",
+    "上方修正", "下方修正", "四半期", "通期見通し",
+    "earnings", "quarterly results", "revenue", "profit", "guidance", "EPS",
+)
 
+MAX_NEWS_PER_STOCK = 3
+MAX_GENERAL_NEWS = 4
+
+
+def _organize_news(all_news: list, watchlist_data: list) -> dict:
+    """
+    ウォッチリスト銘柄ごとの関連ニュース(決算関連は別途フラグ)と、
+    そこに含まれなかった日本/米国それぞれの市場全般ニュースに分類する。
+    銘柄名・コードはタイトルと概要の両方から検索し、一致した記事は
+    どちらか一方のバケットにのみ入れて重複を避ける。
+    """
+    stock_news: dict = {}
+    earnings_news: dict = {}
+    used_links: set = set()
+
+    for stock in watchlist_data:
+        code = stock.get("code", "")
+        keywords = [kw for kw in (stock.get("name", ""), code) if kw]
+        matched = []
+        for item in all_news:
+            link = item.get("link", "")
+            if link in used_links:
+                continue
+            text = item.get("title", "") + item.get("summary", "")
+            if any(kw in text for kw in keywords):
+                matched.append(item)
+                if len(matched) >= MAX_NEWS_PER_STOCK:
+                    break
+
+        if not matched:
+            continue
+
+        for item in matched:
+            used_links.add(item.get("link", ""))
+        stock_news[code] = matched
+
+        earnings = [
+            item for item in matched
+            if any(kw in (item.get("title", "") + item.get("summary", "")) for kw in EARNINGS_KEYWORDS)
+        ]
+        if earnings:
+            earnings_news[code] = earnings
+
+    jp_general, us_general = [], []
     for item in all_news:
-        title = item.get("title", "")
-        if any(kw in title for kw in names | codes if kw):
-            relevant.append(item)
-        else:
-            general.append(item)
+        if item.get("link", "") in used_links:
+            continue
+        category = item.get("category", "")
+        if category in ("jp_economy", "jp_market"):
+            jp_general.append(item)
+        elif category in ("us_market", "global"):
+            us_general.append(item)
 
-    return relevant[:5] + general[:5]
+    return {
+        "stock_news": stock_news,
+        "earnings_news": earnings_news,
+        "jp_general": jp_general[:MAX_GENERAL_NEWS],
+        "us_general": us_general[:MAX_GENERAL_NEWS],
+    }
 
 
 def _scan_all_users() -> list:

@@ -10,27 +10,31 @@ SCRIPT_SYSTEM_PROMPT = """あなたはプロの株価情報ラジオパーソナ
 - 自然な話し言葉（です・ます調）
 - 数字は読み上げやすい表現（例: 3万8000円、プラス1.5パーセント）
 - 上昇・下落を明確に、かつポジティブに伝える
-- 合計 900〜1500文字（約3〜5分の放送）
+- ウォッチリスト銘柄は株価だけで終わらせず、関連ニュースや決算情報が
+  あれば必ず触れて内容に厚みを持たせる（決算情報は特に詳しく）
+- 合計 1600〜2400文字（約6〜8分の放送）
 - 台本テキストのみ出力（説明・見出しは不要）"""
 
 SCRIPT_PROMPT_TEMPLATE = """【放送日】{date_str}
 
 【台本構成】
 1. 冒頭あいさつ（15秒）
-2. 米国市場の動向（30秒）
-3. 日本市場の概況（30秒）
-4. ウォッチリスト銘柄（銘柄ごと約20秒）
-5. 注目ニュース（30秒）
-6. 締めのあいさつ（10秒）
+2. 米国市場の動向と関連ニュース（60秒）
+3. 日本市場の概況と関連ニュース（60秒）
+4. ウォッチリスト銘柄（株価に加え、関連ニュースや決算情報があれば言及。銘柄ごと約40秒）
+5. 締めのあいさつ（10秒）
 
 【市場データ】
 {market_summary}
 
-【ウォッチリスト銘柄】
-{watchlist_summary}
+【米国市場の関連ニュース】
+{us_general_news}
 
-【最新ニュース（上位8件）】
-{news_summary}
+【日本市場の関連ニュース】
+{jp_general_news}
+
+【ウォッチリスト銘柄（株価・関連ニュース・決算情報）】
+{watchlist_summary}
 
 台本を作成してください。"""
 
@@ -39,27 +43,31 @@ Follow these rules when writing the script:
 - Natural, conversational spoken English
 - Read numbers in an easy-to-follow way (e.g., "38,000 yen", "up 1.5 percent")
 - Clearly and positively convey gains and losses
-- Total length: 700-1100 words (about 3-5 minutes of broadcast)
+- Don't stop at the price for watchlist stocks - always mention related news
+  or earnings information when available (go into extra detail for earnings)
+- Total length: 1200-1800 words (about 6-8 minutes of broadcast)
 - Output only the script text (no explanations or headings)"""
 
 SCRIPT_PROMPT_TEMPLATE_EN = """[Broadcast date] {date_str}
 
 [Script structure]
 1. Opening greeting (15 sec)
-2. US market overview (30 sec)
-3. Japan market overview (30 sec)
-4. Watchlist stocks (about 20 sec each)
-5. Notable news (30 sec)
-6. Closing greeting (10 sec)
+2. US market overview and related news (60 sec)
+3. Japan market overview and related news (60 sec)
+4. Watchlist stocks (price plus related news/earnings if available, about 40 sec each)
+5. Closing greeting (10 sec)
 
 [Market data]
 {market_summary}
 
-[Watchlist stocks]
-{watchlist_summary}
+[US market related news]
+{us_general_news}
 
-[Latest news (top 8)]
-{news_summary}
+[Japan market related news]
+{jp_general_news}
+
+[Watchlist stocks (price, related news, earnings)]
+{watchlist_summary}
 
 Please write the script."""
 
@@ -74,9 +82,9 @@ class ScriptGenerator:
         self._backend = _build_backend(provider)
 
     def generate(self, radio_date: str, market_data: dict,
-                 watchlist_data: list, news: list, language: str = "ja") -> str:
+                 watchlist_data: list, news_bundle: dict, language: str = "ja") -> str:
         system_prompt = SCRIPT_SYSTEM_PROMPT_EN if language == "en" else SCRIPT_SYSTEM_PROMPT
-        prompt = _build_prompt(radio_date, market_data, watchlist_data, news, language)
+        prompt = _build_prompt(radio_date, market_data, watchlist_data, news_bundle, language)
         try:
             script = self._backend.generate(prompt, system_prompt)
             logger.info(f"台本生成完了: {len(script)} 文字")
@@ -102,7 +110,7 @@ class _GroqBackend:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=2048,
+            max_tokens=3000,
             temperature=0.7,
         )
         return resp.choices[0].message.content.strip()
@@ -123,7 +131,7 @@ class _GeminiBackend:
         )
         resp = model.generate_content(
             prompt,
-            generation_config={"temperature": 0.7, "max_output_tokens": 2048},
+            generation_config={"temperature": 0.7, "max_output_tokens": 3000},
         )
         return resp.text.strip()
 
@@ -138,7 +146,7 @@ class _ClaudeBackend:
     def generate(self, prompt: str, system_prompt: str) -> str:
         msg = self._client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=2048,
+            max_tokens=3000,
             system=system_prompt,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -159,7 +167,7 @@ class _OpenAIBackend:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=2048,
+            max_tokens=3000,
             temperature=0.7,
         )
         return resp.choices[0].message.content.strip()
@@ -178,22 +186,24 @@ def _build_backend(provider: str) -> _LLMBackend:
 # ── プロンプト構築 ──────────────────────────────────────────────────
 
 def _build_prompt(radio_date: str, market_data: dict,
-                  watchlist_data: list, news: list, language: str = "ja") -> str:
+                  watchlist_data: list, news_bundle: dict, language: str = "ja") -> str:
     if language == "en":
         date_str = datetime.strptime(radio_date, "%Y-%m-%d").strftime("%B %d, %Y")
         return SCRIPT_PROMPT_TEMPLATE_EN.format(
             date_str=date_str,
             market_summary=_fmt_market_en(market_data),
-            watchlist_summary=_fmt_watchlist_en(watchlist_data),
-            news_summary=_fmt_news(news),
+            us_general_news=_fmt_general_news_en(news_bundle.get("us_general", [])),
+            jp_general_news=_fmt_general_news_en(news_bundle.get("jp_general", [])),
+            watchlist_summary=_fmt_watchlist_en(watchlist_data, news_bundle),
         )
 
     date_str = datetime.strptime(radio_date, "%Y-%m-%d").strftime("%Y年%m月%d日")
     return SCRIPT_PROMPT_TEMPLATE.format(
         date_str=date_str,
         market_summary=_fmt_market(market_data),
-        watchlist_summary=_fmt_watchlist(watchlist_data),
-        news_summary=_fmt_news(news),
+        us_general_news=_fmt_general_news(news_bundle.get("us_general", [])),
+        jp_general_news=_fmt_general_news(news_bundle.get("jp_general", [])),
+        watchlist_summary=_fmt_watchlist(watchlist_data, news_bundle),
     )
 
 
@@ -216,28 +226,34 @@ def _fmt_market(data: dict) -> str:
     return "\n".join(lines)
 
 
-def _fmt_watchlist(stocks: list) -> str:
+def _fmt_watchlist(stocks: list, news_bundle: dict) -> str:
     if not stocks:
         return "ウォッチリストに銘柄が登録されていません"
+    stock_news = news_bundle.get("stock_news", {})
+    earnings_news = news_bundle.get("earnings_news", {})
     lines = []
     for s in stocks:
+        code = s.get("code", "")
         pct = s.get("change_pct", 0)
         sign = "+" if pct >= 0 else ""
         mkt = "東証" if s.get("market") == "JP" else "米国"
         lines.append(
-            f"・{s.get('name', s.get('code'))}（{mkt}）"
+            f"・{s.get('name', code)}（{mkt}）"
             f" 終値{s.get('close', 'N/A')} 前日比{sign}{pct:.2f}%"
         )
+        earnings = earnings_news.get(code, [])
+        for item in earnings:
+            lines.append(f"  - 【決算】{item.get('title', '')}")
+        for item in stock_news.get(code, []):
+            if item not in earnings:
+                lines.append(f"  - 関連ニュース: {item.get('title', '')}")
     return "\n".join(lines)
 
 
-def _fmt_news(news: list) -> str:
-    if not news:
-        return "ニュースなし"
-    lines = []
-    for i, item in enumerate(news[:8], 1):
-        lines.append(f"{i}. 【{item.get('source', '')}】{item.get('title', '')}")
-    return "\n".join(lines)
+def _fmt_general_news(items: list) -> str:
+    if not items:
+        return "特筆すべきニュースなし"
+    return "\n".join(f"・{item.get('title', '')}" for item in items)
 
 
 def _fmt_market_en(data: dict) -> str:
@@ -259,19 +275,34 @@ def _fmt_market_en(data: dict) -> str:
     return "\n".join(lines)
 
 
-def _fmt_watchlist_en(stocks: list) -> str:
+def _fmt_watchlist_en(stocks: list, news_bundle: dict) -> str:
     if not stocks:
         return "No stocks in the watchlist"
+    stock_news = news_bundle.get("stock_news", {})
+    earnings_news = news_bundle.get("earnings_news", {})
     lines = []
     for s in stocks:
+        code = s.get("code", "")
         pct = s.get("change_pct", 0)
         sign = "+" if pct >= 0 else ""
         mkt = "Tokyo" if s.get("market") == "JP" else "US"
         lines.append(
-            f"- {s.get('name', s.get('code'))} ({mkt})"
+            f"- {s.get('name', code)} ({mkt})"
             f" close {s.get('close', 'N/A')}, change {sign}{pct:.2f}%"
         )
+        earnings = earnings_news.get(code, [])
+        for item in earnings:
+            lines.append(f"  - [Earnings] {item.get('title', '')}")
+        for item in stock_news.get(code, []):
+            if item not in earnings:
+                lines.append(f"  - Related news: {item.get('title', '')}")
     return "\n".join(lines)
+
+
+def _fmt_general_news_en(items: list) -> str:
+    if not items:
+        return "No notable news"
+    return "\n".join(f"- {item.get('title', '')}" for item in items)
 
 
 def _fallback_script(radio_date: str, market_data: dict, watchlist_data: list, language: str = "ja") -> str:
