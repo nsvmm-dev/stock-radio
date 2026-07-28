@@ -2,6 +2,7 @@ import SwiftUI
 import FirebaseCore
 import FirebaseMessaging
 import UserNotifications
+import GoogleMobileAds
 
 @main
 struct StockRadioApp: App {
@@ -76,6 +77,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
         application.registerForRemoteNotifications()
+
+        GADMobileAds.sharedInstance().start(completionHandler: nil)
 
         return true
     }

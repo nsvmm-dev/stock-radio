@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		115A792FA156B3F4C5B97DCB /* SafariView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D75DCEB44E66E43A0336963 /* SafariView.swift */; };
 		18839B2CBBFFE67C07233616 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 62FF419AABD3A8C9197707B9 /* FirebaseMessaging */; };
+		1FABADCFF71F508655284BA2 /* BannerAdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E5E832CFCC37B3D315E2D3 /* BannerAdView.swift */; };
 		2299E844026825F4845D08E1 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016BCCE2C7978A7EBBC5327B /* MainTabView.swift */; };
 		2F700B5C1BC38874DFA46926 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CE4F84C565F12AC8287609 /* APIService.swift */; };
 		3602C151A75C8E0C079F3616 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92C6919F522DC860166EDCA /* HomeView.swift */; };
@@ -18,6 +19,7 @@
 		87A5F75985512B882B2001D4 /* AudioPlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B1BD54BFF6CE5A971548E25 /* AudioPlayerService.swift */; };
 		87FD36E032B8F62BDDA89970 /* StockDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E972F9A64A804AB4AF3B454A /* StockDetailView.swift */; };
 		892CA6A3510600E271960FFF /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = F1C82BC45EA03813006EE052 /* FirebaseCore */; };
+		8CEEC70BFA6EBA7DD2A64EDA /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 61F5A23C4956F7E136F00FA0 /* GoogleMobileAds */; };
 		9530FB1DB2FDE355C58FFD6D /* StockRowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A2F9AF1523E0634204B4ED /* StockRowViews.swift */; };
 		BB198F09A6A83008B74E14A4 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C4F263F06F49E8FC837CDCF /* Models.swift */; };
 		BCA39E04B180709766D50262 /* StockRadioApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE7E0C7684694743292116DA /* StockRadioApp.swift */; };
@@ -38,6 +40,7 @@
 		6F6987343DF40714E6DE08C0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		81BCC2CDADC11F27968B7E4F /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		8C4F263F06F49E8FC837CDCF /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		A9E5E832CFCC37B3D315E2D3 /* BannerAdView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerAdView.swift; sourceTree = "<group>"; };
 		B5A2F9AF1523E0634204B4ED /* StockRowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StockRowViews.swift; sourceTree = "<group>"; };
 		CFABF2584323777BEE610E83 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		D30DD7CB6EB191AA291494DF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -55,6 +58,7 @@
 			files = (
 				892CA6A3510600E271960FFF /* FirebaseCore in Frameworks */,
 				18839B2CBBFFE67C07233616 /* FirebaseMessaging in Frameworks */,
+				8CEEC70BFA6EBA7DD2A64EDA /* GoogleMobileAds in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -64,6 +68,7 @@
 		162DB520FFBC286D3BF6FE0D /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				A9E5E832CFCC37B3D315E2D3 /* BannerAdView.swift */,
 				0D75DCEB44E66E43A0336963 /* SafariView.swift */,
 				B5A2F9AF1523E0634204B4ED /* StockRowViews.swift */,
 			);
@@ -168,6 +173,7 @@
 			packageProductDependencies = (
 				F1C82BC45EA03813006EE052 /* FirebaseCore */,
 				62FF419AABD3A8C9197707B9 /* FirebaseMessaging */,
+				61F5A23C4956F7E136F00FA0 /* GoogleMobileAds */,
 			);
 			productName = StockRadio;
 			productReference = 6207B245907297968F4AA311 /* StockRadio.app */;
@@ -199,6 +205,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				5C5D4362AF6BF1819155AAF1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				7D163016C0EC8DF4910A1DC8 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9834B80B009E44E75AFCE1F6 /* Products */;
@@ -229,6 +236,7 @@
 			files = (
 				2F700B5C1BC38874DFA46926 /* APIService.swift in Sources */,
 				87A5F75985512B882B2001D4 /* AudioPlayerService.swift in Sources */,
+				1FABADCFF71F508655284BA2 /* BannerAdView.swift in Sources */,
 				D319D9773B6700418DA86ABE /* DiscoverView.swift in Sources */,
 				E95CEDD50BA780D66CEA9F9A /* HomeDashboardView.swift in Sources */,
 				3602C151A75C8E0C079F3616 /* HomeView.swift in Sources */,
@@ -438,9 +446,22 @@
 				minimumVersion = 11.0.0;
 			};
 		};
+		7D163016C0EC8DF4910A1DC8 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googleads/swift-package-manager-google-mobile-ads.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		61F5A23C4956F7E136F00FA0 /* GoogleMobileAds */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7D163016C0EC8DF4910A1DC8 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
+			productName = GoogleMobileAds;
+		};
 		62FF419AABD3A8C9197707B9 /* FirebaseMessaging */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 5C5D4362AF6BF1819155AAF1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
