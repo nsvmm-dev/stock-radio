@@ -6,20 +6,14 @@ import boto3
 
 logger = logging.getLogger()
 
-# ユーザーがマイページで選択できるナレーター音声。
-# 日本語は Mizuki(standard, 無料枠) / Kazuha(neural, 高品質・課金発生) の2択。
-# 英語は Joanna のみ(選択肢なし)。
-RADIO_VOICES = {
-    "ja": {
-        "mizuki": {"voiceId": "Mizuki", "engine": "standard"},
-        "kazuha": {"voiceId": "Kazuha", "engine": "neural"},
-    },
-    "en": {
-        "joanna": {"voiceId": "Joanna", "engine": "standard"},
-    },
+# プランに応じて自動で切り替わるナレーター音声エンジン。
+# free: standard(Mizuki/Joanna) / standard・pro: neural(Kazuha/Joanna, 高品質・課金発生)
+VOICE_MAP = {
+    "ja": {"standard": "Mizuki", "neural": "Kazuha"},
+    "en": {"standard": "Joanna", "neural": "Joanna"},
 }
 
-DEFAULT_VOICE = {"ja": "mizuki", "en": "joanna"}
+PAID_PLANS = {"standard", "pro"}
 
 LANGUAGE_CODE_MAP = {
     "ja": "ja-JP",
@@ -35,21 +29,18 @@ POLLY_CHAR_LIMIT = 2900  # Polly 1リクエストあたりの文字数上限
 
 
 class TTSGenerator:
-    def __init__(self, language: str = "ja", voice: str = None):
+    def __init__(self, language: str = "ja", plan: str = "free"):
         self._polly = boto3.client("polly")
-        self._language = language if language in RADIO_VOICES else "ja"
-        voices = RADIO_VOICES[self._language]
-        voice_key = voice if voice in voices else DEFAULT_VOICE[self._language]
-        selected = voices[voice_key]
+        self._language = language if language in VOICE_MAP else "ja"
 
-        # neural音声はTTS_ENGINE=neuralの本番環境でのみ使用する(dev/testでの誤課金を防ぐため、
-        # ユーザーがneural音声を選択していてもTTS_ENGINE=standardの環境ではデフォルト音声にフォールバック)
-        if selected["engine"] == "neural" and os.environ.get("TTS_ENGINE", "standard") != "neural":
-            voice_key = DEFAULT_VOICE[self._language]
-            selected = voices[voice_key]
+        engine = "neural" if plan in PAID_PLANS else "standard"
+        # neuralはTTS_ENGINE=neuralの本番環境でのみ使用する(dev/testでの誤課金を防ぐため、
+        # 有料プランでもTTS_ENGINE=standardの環境ではstandardにフォールバック)
+        if engine == "neural" and os.environ.get("TTS_ENGINE", "standard") != "neural":
+            engine = "standard"
 
-        self._voice_id = selected["voiceId"]
-        self._engine = selected["engine"]
+        self._engine = engine
+        self._voice_id = VOICE_MAP[self._language][engine]
         self._language_code = LANGUAGE_CODE_MAP[self._language]
 
     def synthesize(self, text: str) -> bytes:

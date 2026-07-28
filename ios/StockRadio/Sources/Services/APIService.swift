@@ -102,16 +102,6 @@ final class APIService {
         throw APIError.serverError(http.statusCode)
     }
 
-    /// ラジオ音声の変更。free プランやクールダウン中は 403 とともにサーバー側の
-    /// メッセージが返るため、request() 経由で APIMessageError として伝える。
-    func updateRadioVoice(userId: String, voice: String) async throws -> String {
-        struct Body: Encodable { let voice: String }
-        struct Res: Decodable { let voice: String }
-        let res: Res = try await request("/users/\(userId)/voice", method: "PUT",
-                                          body: Body(voice: voice))
-        return res.voice
-    }
-
     // ── ラジオ ───────────────────────────────────────────────────────
 
     func listRadios(userId: String) async throws -> [RadioMeta] {

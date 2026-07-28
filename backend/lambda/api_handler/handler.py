@@ -79,10 +79,6 @@ def _route(method, path, query_params, body):
         if len(segments) == 3 and segments[2] == "language" and method == "PUT":
             return _update_language(user_id, body)
 
-        # PUT /users/{userId}/voice
-        if len(segments) == 3 and segments[2] == "voice" and method == "PUT":
-            return _update_voice(user_id, body)
-
         # PUT /users/{userId}/fcm-token
         if len(segments) == 3 and segments[2] == "fcm-token" and method == "PUT":
             return _update_fcm_token(user_id, body)
@@ -205,63 +201,6 @@ def _update_language(user_id: str, body: dict):
         ExpressionAttributeValues={":lang": language, ":now": now.isoformat()},
     )
     return _res(200, {"language": language})
-
-
-VOICE_CHANGE_COOLDOWN_DAYS = 30
-# ラジオ言語ごとに選択できるナレーター音声(tts_generator.RADIO_VOICESと対応)
-RADIO_VOICE_OPTIONS = {
-    "ja": ("mizuki", "kazuha"),
-    "en": ("joanna",),
-}
-
-
-def _update_voice(user_id: str, body: dict):
-    voice = body.get("voice")
-
-    table = dynamodb.Table(os.environ["USERS_TABLE"])
-    result = table.get_item(Key={"userId": user_id})
-    if "Item" not in result:
-        return _res(404, {"error": "user not found"})
-    user = result["Item"]
-    plan = user.get("plan", "free")
-    language = user.get("language", "ja")
-
-    valid_voices = RADIO_VOICE_OPTIONS.get(language, RADIO_VOICE_OPTIONS["ja"])
-    if voice not in valid_voices:
-        return _res(400, {"error": f"voice must be one of {', '.join(valid_voices)}"})
-
-    if plan == "free":
-        return _res(403, {"error": "free_plan_locked",
-                           "message": "ラジオ音声の変更には有料プランへのアップグレードが必要です"})
-
-    now = datetime.now(JST)
-
-    # standard プランのみ30日クールダウンを課す(pro は自由に変更可能)
-    if plan == "standard":
-        changed_at_str = user.get("voiceChangedAt")
-        if changed_at_str:
-            changed_at = datetime.fromisoformat(changed_at_str)
-            elapsed_days = (now - changed_at).days
-            if elapsed_days < VOICE_CHANGE_COOLDOWN_DAYS:
-                next_available = changed_at + timedelta(days=VOICE_CHANGE_COOLDOWN_DAYS)
-                return _res(403, {
-                    "error": "cooldown",
-                    "message": "ラジオ音声は前回の変更から30日間は再変更できません",
-                    "nextAvailableDate": next_available.strftime("%Y-%m-%d"),
-                })
-        table.update_item(
-            Key={"userId": user_id},
-            UpdateExpression="SET radioVoice = :v, voiceChangedAt = :now, updatedAt = :now",
-            ExpressionAttributeValues={":v": voice, ":now": now.isoformat()},
-        )
-        return _res(200, {"voice": voice})
-
-    table.update_item(
-        Key={"userId": user_id},
-        UpdateExpression="SET radioVoice = :v, updatedAt = :now",
-        ExpressionAttributeValues={":v": voice, ":now": now.isoformat()},
-    )
-    return _res(200, {"voice": voice})
 
 
 # ── ラジオ ───────────────────────────────────────────────────────────
