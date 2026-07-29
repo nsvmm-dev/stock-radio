@@ -20,7 +20,7 @@ struct StockDetailView: View {
             }
             .listRowSeparator(.hidden)
 
-            Section("ニュース") {
+            Section {
                 if vm.isLoadingNews {
                     ProgressView()
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -38,6 +38,9 @@ struct StockDetailView: View {
                         .buttonStyle(.plain)
                     }
                 }
+            } header: {
+                Text("ニュース")
+                    .foregroundStyle(theme.secondaryText)
             }
         }
         .listStyle(.plain)

@@ -26,6 +26,7 @@ struct HomeDashboardView: View {
                 } header: {
                     HStack {
                         Text("今日のラジオ")
+                            .foregroundStyle(theme.secondaryText)
                         Spacer()
                         NavigationLink("すべて見る") {
                             RadioHistoryListView()
@@ -35,7 +36,7 @@ struct HomeDashboardView: View {
                     }
                 }
 
-                Section("お気に入り銘柄") {
+                Section {
                     if vm.isLoadingWatchlist {
                         ProgressView()
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -53,6 +54,9 @@ struct HomeDashboardView: View {
                             }
                         }
                     }
+                } header: {
+                    Text("お気に入り銘柄")
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
             .listStyle(.plain)

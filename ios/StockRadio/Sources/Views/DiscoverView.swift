@@ -8,11 +8,14 @@ struct DiscoverView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("銘柄を追加") {
+                Section {
                     AddStockRow { code, name, market in
                         Task { await vm.add(code: code, name: name, market: market,
                                            userId: appState.userId ?? "") }
                     }
+                } header: {
+                    Text("銘柄を追加")
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
             .scrollContentBackground(.hidden)

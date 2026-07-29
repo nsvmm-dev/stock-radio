@@ -17,25 +17,37 @@ struct MyPageView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("アカウント") {
-                    LabeledContent("ユーザーID") {
+                Section {
+                    LabeledContent {
                         Text(appState.userId ?? localized("未設定"))
                             .font(.caption)
                             .foregroundStyle(theme.secondaryText)
+                    } label: {
+                        Text("ユーザーID")
+                            .foregroundStyle(theme.primaryText)
                     }
-                    LabeledContent("現在のプラン") {
+                    LabeledContent {
                         Text(Plan(rawValue: appState.plan)?.displayName ?? appState.plan)
                             .foregroundStyle(theme.accent)
+                    } label: {
+                        Text("現在のプラン")
+                            .foregroundStyle(theme.primaryText)
                     }
+                } header: {
+                    Text("アカウント")
+                        .foregroundStyle(theme.secondaryText)
                 }
 
-                Section("外観") {
+                Section {
                     Picker("外観", selection: $appState.uiTheme) {
                         ForEach(AppTheme.allCases, id: \.self) { t in
                             Text(t.displayName).tag(t)
                         }
                     }
                     .pickerStyle(.segmented)
+                } header: {
+                    Text("外観")
+                        .foregroundStyle(theme.secondaryText)
                 }
 
                 Section {
@@ -70,23 +82,31 @@ struct MyPageView: View {
                     }
                 } header: {
                     Text("プランを変更")
+                        .foregroundStyle(theme.secondaryText)
                 } footer: {
                     Text("フリーへの変更(解約)はiPhoneの設定 > Apple ID > サブスクリプション から行えます")
+                        .foregroundStyle(theme.secondaryText)
                 }
 
-                Section("表示言語") {
+                Section {
                     Picker("表示言語", selection: $appState.displayLanguage) {
                         Text("日本語").tag("ja")
                         Text("English").tag("en")
                     }
                     .pickerStyle(.segmented)
+                } header: {
+                    Text("表示言語")
+                        .foregroundStyle(theme.secondaryText)
                 }
 
                 Section {
                     if appState.plan == "free" {
-                        LabeledContent("ラジオ言語") {
+                        LabeledContent {
                             Text(appState.radioLanguage == "en" ? "English" : "日本語")
                                 .foregroundStyle(theme.secondaryText)
+                        } label: {
+                            Text("ラジオ言語")
+                                .foregroundStyle(theme.primaryText)
                         }
                         Text("有料プランにアップグレードすると変更できます")
                             .font(.caption)
@@ -117,12 +137,16 @@ struct MyPageView: View {
                     }
                 } header: {
                     Text("ラジオ言語")
+                        .foregroundStyle(theme.secondaryText)
                 }
 
                 Section {
-                    LabeledContent("ラジオ音声") {
+                    LabeledContent {
                         Text(Plan(rawValue: appState.plan)?.voiceQualityText ?? "")
                             .foregroundStyle(theme.secondaryText)
+                    } label: {
+                        Text("ラジオ音声")
+                            .foregroundStyle(theme.primaryText)
                     }
                     if appState.plan == "free" {
                         Text("有料プランでは高品質な音声(Neural)が自動的に使われます")
@@ -131,9 +155,10 @@ struct MyPageView: View {
                     }
                 } header: {
                     Text("ラジオ音声")
+                        .foregroundStyle(theme.secondaryText)
                 }
 
-                Section("お気に入り銘柄") {
+                Section {
                     Picker("市場", selection: $selectedMarket) {
                         Text("米国株").tag("US")
                         Text("日本株").tag("JP")
@@ -156,11 +181,17 @@ struct MyPageView: View {
                             }
                         }
                     }
+                } header: {
+                    Text("お気に入り銘柄")
+                        .foregroundStyle(theme.secondaryText)
                 }
 
-                Section("サポート") {
+                Section {
                     Link("利用規約", destination: URL(string: "https://example.com/terms")!)
                     Link("プライバシーポリシー", destination: URL(string: "https://example.com/privacy")!)
+                } header: {
+                    Text("サポート")
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
             .scrollContentBackground(.hidden)
