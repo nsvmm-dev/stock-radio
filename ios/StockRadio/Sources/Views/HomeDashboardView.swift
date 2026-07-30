@@ -62,7 +62,7 @@ struct HomeDashboardView: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(theme.background.ignoresSafeArea(edges: .bottom))
-            .navigationTitle("株価ラジオ")
+            .navigationTitle("Bull Cast")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: StockRef.self) { ref in
                 StockDetailView(ref: ref)

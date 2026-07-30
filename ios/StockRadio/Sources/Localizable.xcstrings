@@ -597,16 +597,6 @@
         }
       }
     },
-    "株価ラジオ": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stock Radio"
-          }
-        }
-      }
-    },
     "検索": {
       "localizations": {
         "en": {

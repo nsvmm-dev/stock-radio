@@ -374,7 +374,7 @@ struct OnboardingView: View {
                 .foregroundStyle(.blue.gradient)
 
             VStack(spacing: 8) {
-                Text("株価ラジオ")
+                Text("Bull Cast")
                     .font(.largeTitle.bold())
                 Text("毎朝7時、あなたの銘柄の\n最新情報をラジオでお届け")
                     .font(.body)

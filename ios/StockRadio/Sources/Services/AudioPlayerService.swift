@@ -94,8 +94,8 @@ final class AudioPlayerService: ObservableObject {
 
     private func updateNowPlayingInfo(radio: RadioMeta) {
         var info: [String: Any] = [
-            MPMediaItemPropertyTitle: "\(radio.radioDate) 株価ラジオ",
-            MPMediaItemPropertyArtist: "Stock Radio",
+            MPMediaItemPropertyTitle: "\(radio.radioDate) Bull Cast",
+            MPMediaItemPropertyArtist: "Bull Cast",
             MPNowPlayingInfoPropertyPlaybackRate: playbackRate,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
         ]

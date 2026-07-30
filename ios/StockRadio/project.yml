@@ -33,6 +33,7 @@ targets:
       path: Sources/Info.plist
       properties:
         UILaunchScreen: {}
+        CFBundleDisplayName: Bull Cast
         CFBundleLocalizations:
           - ja
           - en

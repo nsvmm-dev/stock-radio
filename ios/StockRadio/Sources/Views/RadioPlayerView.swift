@@ -22,7 +22,7 @@ struct RadioPlayerView: View {
 
             // タイトル
             VStack(spacing: 4) {
-                Text("株価ラジオ")
+                Text("Bull Cast")
                     .font(.title2.bold())
                     .foregroundStyle(theme.primaryText)
                 Text(radio.radioDate)
