@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RadioPlayerView: View {
+    @Environment(\.appTheme) private var theme
     let radio: RadioMeta
     @StateObject private var vm: RadioPlayerViewModel
     @ObservedObject private var player = AudioPlayerService.shared
@@ -17,15 +18,16 @@ struct RadioPlayerView: View {
             // アートワーク
             Image(systemName: "waveform.circle.fill")
                 .font(.system(size: 120))
-                .foregroundStyle(.blue.gradient)
+                .foregroundStyle(theme.accent.gradient)
 
             // タイトル
             VStack(spacing: 4) {
                 Text("株価ラジオ")
                     .font(.title2.bold())
+                    .foregroundStyle(theme.primaryText)
                 Text(radio.radioDate)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
             }
 
             // シークバー
@@ -37,7 +39,7 @@ struct RadioPlayerView: View {
                         if !editing { player.seek(to: player.currentTime) }
                     }
                 )
-                .tint(.blue)
+                .tint(theme.accent)
 
                 HStack {
                     Text(formatTime(player.currentTime))
@@ -45,7 +47,7 @@ struct RadioPlayerView: View {
                     Text(formatTime(player.duration))
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
             }
             .padding(.horizontal)
 
@@ -69,7 +71,7 @@ struct RadioPlayerView: View {
                         .font(.title)
                 }
             }
-            .foregroundStyle(.primary)
+            .foregroundStyle(theme.primaryText)
 
             // 再生速度
             PlaybackRatePicker(rate: player.playbackRate) { rate in
@@ -78,6 +80,7 @@ struct RadioPlayerView: View {
 
             Spacer()
         }
+        .background(theme.background.ignoresSafeArea())
         .navigationTitle("ラジオを聴く")
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
@@ -111,6 +114,7 @@ struct RadioPlayerView: View {
 // ── 再生速度ピッカー ────────────────────────────────────────────────
 
 struct PlaybackRatePicker: View {
+    @Environment(\.appTheme) private var theme
     let rate: Float
     let onChange: (Float) -> Void
     private let rates: [Float] = [0.75, 1.0, 1.25, 1.5, 2.0]
@@ -125,8 +129,8 @@ struct PlaybackRatePicker: View {
                         .font(.caption.bold())
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(rate == r ? Color.blue : Color.clear)
-                        .foregroundStyle(rate == r ? .white : .primary)
+                        .background(rate == r ? theme.accent : Color.clear)
+                        .foregroundStyle(rate == r ? .white : theme.primaryText)
                 }
             }
         }

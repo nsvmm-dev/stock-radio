@@ -3,6 +3,7 @@ import SwiftUI
 // ── お気に入り銘柄(ホーム用) ─────────────────────────────────────────
 
 struct FavoriteStockRowView: View {
+    @Environment(\.appTheme) private var theme
     let item: WatchlistItem
 
     var body: some View {
@@ -10,9 +11,10 @@ struct FavoriteStockRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.stockName)
                     .font(.headline)
+                    .foregroundStyle(theme.primaryText)
                 Text("\(item.stockCode) · \(item.market.marketDisplayName)")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
             }
 
             Spacer()
@@ -24,6 +26,7 @@ struct FavoriteStockRowView: View {
 // ── ウォッチリスト行(マイページ用、SearchViewから移設) ───────────────
 
 struct WatchlistRowView: View {
+    @Environment(\.appTheme) private var theme
     let item: WatchlistItem
     let onRemove: () -> Void
 
@@ -32,9 +35,10 @@ struct WatchlistRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.stockName)
                     .font(.headline)
+                    .foregroundStyle(theme.primaryText)
                 Text("\(item.stockCode) · \(item.market.marketDisplayName)")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
             }
             Spacer()
             Button(role: .destructive) { onRemove() } label: {

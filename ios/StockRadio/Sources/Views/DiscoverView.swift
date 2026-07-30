@@ -2,19 +2,26 @@ import SwiftUI
 
 struct DiscoverView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.appTheme) private var theme
     @StateObject private var vm = DiscoverViewModel()
 
     var body: some View {
         NavigationStack {
             List {
-                Section("銘柄を追加") {
+                Section {
                     AddStockRow { code, name, market in
                         Task { await vm.add(code: code, name: name, market: market,
                                            userId: appState.userId ?? "") }
                     }
+                } header: {
+                    Text("銘柄を追加")
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(theme.background.ignoresSafeArea())
             .navigationTitle("検索")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: StockRef.self) { ref in
                 StockDetailView(ref: ref)
             }
@@ -39,6 +46,7 @@ struct DiscoverView: View {
 }
 
 struct AddStockRow: View {
+    @Environment(\.appTheme) private var theme
     let onAdd: (String, String, String) -> Void
 
     @State private var query = ""
@@ -81,7 +89,7 @@ struct AddStockRow: View {
             } else if !trimmedQuery.isEmpty && searchResults.isEmpty {
                 Text("該当する銘柄が見つかりません")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
             } else {
                 ForEach(searchResults) { result in
                     Button {
@@ -91,14 +99,14 @@ struct AddStockRow: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(result.name)
                                     .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(theme.primaryText)
                                 Text(result.code)
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(theme.secondaryText)
                             }
                             Spacer()
                             Image(systemName: "plus.circle")
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(theme.accent)
                         }
                         .contentShape(Rectangle())
                     }
