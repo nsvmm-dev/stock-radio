@@ -1,6 +1,7 @@
 # NOTE: lambda/radio_generator/news_fetcher.py の複製。
 # Lambda Layer が未整備のため直接コピーしている。RSSフィード等を
 # 変更する場合は両ファイルを同期させること。
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
