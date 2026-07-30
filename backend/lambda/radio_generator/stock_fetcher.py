@@ -99,7 +99,9 @@ class StockFetcher:
                 # get_jp_stock 等が使う4桁コードに正規化して揃える
                 if len(code) == 5 and code.endswith("0"):
                     code = code[:4]
-                result.append({"code": code, "name": name})
+                # 17業種区分(例: 情報通信・サービスその他)を関連ニュース検索に使う
+                sector = item.get("Sector17CodeName", "")
+                result.append({"code": code, "name": name, "sector": sector})
             return result
         except Exception as e:
             logger.error(f"J-Quants listed/info fetch error: {e}")

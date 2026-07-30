@@ -391,12 +391,36 @@ def _load_jp_stock_master() -> list:
 # ── ニュース ─────────────────────────────────────────────────────────
 
 def _get_stock_news(market: str, code: str, name: str):
-    """銘柄名/コードでニュースをライブ取得しフィルタ(RSSはレート制限なし)"""
+    """
+    銘柄名/コード/業種セクターでニュースをライブ取得しフィルタ(RSSはレート制限なし)。
+    銘柄名・コードだけだとヒットするニュースが少なく市場の動向が掴みにくいため、
+    業種の関連ニュースも合わせて拾う。タイトルと概要の両方を検索対象にする。
+    """
     all_news = NewsFetcher().get_all_news()
     keywords = {kw for kw in (code, name) if kw}
 
-    matched = [n for n in all_news if any(kw in n.get("title", "") for kw in keywords)]
-    return _res(200, {"market": market, "code": code, "news": matched[:20]})
+    sector = _get_sector(market, code)
+    if sector:
+        keywords.add(sector)
+
+    matched = [
+        n for n in all_news
+        if any(kw in (n.get("title", "") + n.get("summary", "")) for kw in keywords)
+    ]
+    return _res(200, {"market": market, "code": code, "sector": sector, "news": matched[:20]})
+
+
+def _get_sector(market: str, code: str) -> str:
+    """銘柄の業種を取得。JPはJ-Quantsの17業種区分、USはS&P500静的リストのGICSセクター"""
+    if market == "JP":
+        master = _load_jp_stock_master()
+        item = next((m for m in master if m.get("code") == code), None)
+        sector = item.get("sector", "") if item else ""
+        # 「自動車・輸送機」のような複合区分名はニュース本文に一致しにくいため
+        # 先頭の主要区分のみを検索キーワードとして使う
+        return sector.split("・")[0] if sector else ""
+    item = next((t for t in _US_TICKERS if t.get("code") == code), None)
+    return item.get("sector", "") if item else ""
 
 
 # ── ヘルパー ─────────────────────────────────────────────────────────
