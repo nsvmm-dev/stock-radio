@@ -1,7 +1,6 @@
 # NOTE: lambda/radio_generator/news_fetcher.py の複製。
 # Lambda Layer が未整備のため直接コピーしている。RSSフィード等を
 # 変更する場合は両ファイルを同期させること。
-import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -22,6 +21,11 @@ RSS_FEEDS = [
         "lang": "ja",
         "category": "jp_market",
     },
+    {
+        "url": "http://toyokeizai.net/list/feed/rss",
+        "lang": "ja",
+        "category": "jp_economy",
+    },
     # US / global market news
     {
         "url": "https://feeds.bloomberg.com/markets/news.rss",
@@ -38,11 +42,26 @@ RSS_FEEDS = [
         "lang": "en",
         "category": "global",
     },
+    {
+        "url": "https://www.cnbc.com/id/10000108/device/rss/rss.html",
+        "lang": "en",
+        "category": "us_market",
+    },
+    {
+        "url": "https://www.cnbc.com/id/15839135/device/rss/rss.html",
+        "lang": "en",
+        "category": "us_market",
+    },
+    {
+        "url": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+        "lang": "en",
+        "category": "us_market",
+    },
 ]
 
-MAX_NEWS_HOURS = 24  # 24時間以内のニュースのみ使用
-MAX_PER_FEED = 10
-MAX_TOTAL = 40
+MAX_NEWS_HOURS = 36  # 直近36時間以内のニュースを使用(電車通勤等での閲覧を想定し少し広めに)
+MAX_PER_FEED = 15
+MAX_TOTAL = 80
 
 
 class NewsFetcher:
