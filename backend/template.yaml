@@ -31,10 +31,6 @@ Parameters:
     Type: String
     Default: standard
     AllowedValues: [standard, neural]
-  JQuantsApiKey:
-    Type: String
-    NoEcho: true
-    Default: ""
   AlphaVantageApiKey:
     Type: String
     NoEcho: true
@@ -58,7 +54,6 @@ Globals:
         GROQ_API_KEY: !Ref GroqApiKey
         ANTHROPIC_API_KEY: !Ref AnthropicApiKey
         OPENAI_API_KEY: !Ref OpenAiApiKey
-        JQUANTS_API_KEY: !Ref JQuantsApiKey
         ALPHA_VANTAGE_API_KEY: !Ref AlphaVantageApiKey
         FIREBASE_CREDENTIALS_PARAM: !Sub "/stock-radio/${Env}/firebase-credentials"
 

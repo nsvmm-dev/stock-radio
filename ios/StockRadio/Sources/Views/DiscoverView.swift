@@ -50,38 +50,25 @@ struct AddStockRow: View {
     let onAdd: (String, String, String) -> Void
 
     @State private var query = ""
-    @State private var market = "US"
+    private let market = "US"
     @State private var searchResults: [StockSearchResult] = []
     @State private var isSearching = false
     @State private var selectedResult: StockSearchResult?
     @State private var searchTask: Task<Void, Never>?
 
     private var queryPlaceholder: String {
-        market == "JP"
-            ? localized("コードまたは銘柄名 (例: 7203 / トヨタ)")
-            : localized("コードまたは銘柄名 (例: AAPL / Apple)")
+        localized("コードまたは銘柄名 (例: AAPL / Apple)")
     }
     private var trimmedQuery: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                TextField(queryPlaceholder, text: $query)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .onChange(of: query) { _, newValue in
-                        scheduleSearch(newValue)
-                    }
-                Picker("市場", selection: $market) {
-                    Text("米国").tag("US")
-                    Text("東証").tag("JP")
+            TextField(queryPlaceholder, text: $query)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .onChange(of: query) { _, newValue in
+                    scheduleSearch(newValue)
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 120)
-                .onChange(of: market) { _, _ in
-                    scheduleSearch(query)
-                }
-            }
 
             if isSearching {
                 ProgressView()

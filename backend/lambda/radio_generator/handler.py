@@ -57,11 +57,6 @@ def lambda_handler(event, context):
 
     logger.info(f"生成完了: success={generated}, failed={failed}")
 
-    try:
-        _update_jp_stock_master(stock_fetcher)
-    except Exception as e:
-        logger.error(f"銘柄マスタ更新失敗: {e}", exc_info=True)
-
     return {
         "statusCode": 200,
         "body": json.dumps({"generated": generated, "failed": failed, "date": radio_date}),
@@ -69,11 +64,9 @@ def lambda_handler(event, context):
 
 
 def _fetch_market_overview(stock_fetcher: StockFetcher, fetch_date: str) -> dict:
-    """市場概況データを取得 (fetch_date = 前日の市場終値日)"""
+    """米国市場概況データを取得 (fetch_date = 前日の市場終値日)"""
     market = {}
     try:
-        market["nikkei"] = stock_fetcher.get_jp_index("N225", fetch_date)
-        market["topix"] = stock_fetcher.get_jp_index("TOPX", fetch_date)
         # Alpha Vantage はインデックス非対応のため ETF で代用
         # DIA=ダウ, QQQ=NASDAQ100, SPY=S&P500
         market["dow"] = stock_fetcher.get_us_stock("DIA", fetch_date)
@@ -148,21 +141,19 @@ def _calc_ttl(plan: str, now: datetime):
 
 
 def _fetch_watchlist_data(watchlist: list, stock_fetcher: StockFetcher, date: str) -> list:
+    """米国株限定。日本株は前バージョンの登録が残っていてもここで自然に除外される"""
     result = []
     for item in watchlist:
         code = item["stockCode"]
-        market = item.get("market", "JP")
+        if item.get("market", "US") != "US":
+            continue
         try:
-            data = (
-                stock_fetcher.get_jp_stock(code, date)
-                if market == "JP"
-                else stock_fetcher.get_us_stock(code, date)
-            )
+            data = stock_fetcher.get_us_stock(code, date)
             if data:
                 result.append({
                     "name": item.get("stockName", code),
                     "code": code,
-                    "market": market,
+                    "market": "US",
                     **data,
                 })
         except Exception as e:
@@ -183,7 +174,7 @@ MAX_GENERAL_NEWS = 4
 def _organize_news(all_news: list, watchlist_data: list) -> dict:
     """
     ウォッチリスト銘柄ごとの関連ニュース(決算関連は別途フラグ)と、
-    そこに含まれなかった日本/米国それぞれの市場全般ニュースに分類する。
+    そこに含まれなかった米国市場の全般ニュースに分類する。
     銘柄名・コードはタイトルと概要の両方から検索し、一致した記事は
     どちらか一方のバケットにのみ入れて重複を避ける。
     """
@@ -219,20 +210,16 @@ def _organize_news(all_news: list, watchlist_data: list) -> dict:
         if earnings:
             earnings_news[code] = earnings
 
-    jp_general, us_general = [], []
+    us_general = []
     for item in all_news:
         if item.get("link", "") in used_links:
             continue
-        category = item.get("category", "")
-        if category in ("jp_economy", "jp_market"):
-            jp_general.append(item)
-        elif category in ("us_market", "global"):
+        if item.get("category", "") in ("us_market", "global"):
             us_general.append(item)
 
     return {
         "stock_news": stock_news,
         "earnings_news": earnings_news,
-        "jp_general": jp_general[:MAX_GENERAL_NEWS],
         "us_general": us_general[:MAX_GENERAL_NEWS],
     }
 
@@ -258,19 +245,3 @@ def _estimate_duration_sec(script: str, language: str = "ja") -> int:
     # 日本語は約5文字/秒、英語は約14文字/秒(スペース込み)で読まれる
     chars_per_sec = 14 if language == "en" else 5
     return len(script) // chars_per_sec
-
-
-def _update_jp_stock_master(stock_fetcher: StockFetcher):
-    """日本株の全上場銘柄一覧を取得し、検索用に S3 へ保存(1日1回)"""
-    master = stock_fetcher.get_jp_stock_master()
-    if not master:
-        logger.warning("銘柄マスタ取得失敗のためS3更新をスキップ")
-        return
-
-    s3.put_object(
-        Bucket=os.environ["AUDIO_BUCKET"],
-        Key="stock-master/jp.json",
-        Body=json.dumps(master, ensure_ascii=False).encode("utf-8"),
-        ContentType="application/json",
-    )
-    logger.info(f"銘柄マスタ更新: {len(master)}銘柄")

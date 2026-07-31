@@ -19,19 +19,15 @@ SCRIPT_PROMPT_TEMPLATE = """【放送日】{date_str}
 
 【台本構成】
 1. 冒頭あいさつ（15秒）
-2. 米国市場の動向と関連ニュース（60秒）
-3. 日本市場の概況と関連ニュース（60秒）
-4. ウォッチリスト銘柄（株価に加え、関連ニュースや決算情報があれば言及。銘柄ごと約40秒）
-5. 締めのあいさつ（10秒）
+2. 米国市場の動向と関連ニュース（90秒）
+3. ウォッチリスト銘柄（株価に加え、関連ニュースや決算情報があれば言及。銘柄ごと約40秒）
+4. 締めのあいさつ（10秒）
 
 【市場データ】
 {market_summary}
 
 【米国市場の関連ニュース】
 {us_general_news}
-
-【日本市場の関連ニュース】
-{jp_general_news}
 
 【ウォッチリスト銘柄（株価・関連ニュース・決算情報）】
 {watchlist_summary}
@@ -52,19 +48,15 @@ SCRIPT_PROMPT_TEMPLATE_EN = """[Broadcast date] {date_str}
 
 [Script structure]
 1. Opening greeting (15 sec)
-2. US market overview and related news (60 sec)
-3. Japan market overview and related news (60 sec)
-4. Watchlist stocks (price plus related news/earnings if available, about 40 sec each)
-5. Closing greeting (10 sec)
+2. US market overview and related news (90 sec)
+3. Watchlist stocks (price plus related news/earnings if available, about 40 sec each)
+4. Closing greeting (10 sec)
 
 [Market data]
 {market_summary}
 
 [US market related news]
 {us_general_news}
-
-[Japan market related news]
-{jp_general_news}
 
 [Watchlist stocks (price, related news, earnings)]
 {watchlist_summary}
@@ -193,7 +185,6 @@ def _build_prompt(radio_date: str, market_data: dict,
             date_str=date_str,
             market_summary=_fmt_market_en(market_data),
             us_general_news=_fmt_general_news_en(news_bundle.get("us_general", [])),
-            jp_general_news=_fmt_general_news_en(news_bundle.get("jp_general", [])),
             watchlist_summary=_fmt_watchlist_en(watchlist_data, news_bundle),
         )
 
@@ -202,15 +193,12 @@ def _build_prompt(radio_date: str, market_data: dict,
         date_str=date_str,
         market_summary=_fmt_market(market_data),
         us_general_news=_fmt_general_news(news_bundle.get("us_general", [])),
-        jp_general_news=_fmt_general_news(news_bundle.get("jp_general", [])),
         watchlist_summary=_fmt_watchlist(watchlist_data, news_bundle),
     )
 
 
 def _fmt_market(data: dict) -> str:
     NAMES = {
-        "nikkei": "日経平均",
-        "topix": "TOPIX",
         "dow": "ダウ平均(DIA ETF・参考値)",
         "nasdaq": "NASDAQ100(QQQ ETF・参考値)",
         "sp500": "S&P500(SPY ETF・参考値)",
@@ -236,9 +224,8 @@ def _fmt_watchlist(stocks: list, news_bundle: dict) -> str:
         code = s.get("code", "")
         pct = s.get("change_pct", 0)
         sign = "+" if pct >= 0 else ""
-        mkt = "東証" if s.get("market") == "JP" else "米国"
         lines.append(
-            f"・{s.get('name', code)}（{mkt}）"
+            f"・{s.get('name', code)}（米国）"
             f" 終値{s.get('close', 'N/A')} 前日比{sign}{pct:.2f}%"
         )
         earnings = earnings_news.get(code, [])
@@ -258,8 +245,6 @@ def _fmt_general_news(items: list) -> str:
 
 def _fmt_market_en(data: dict) -> str:
     NAMES = {
-        "nikkei": "Nikkei 225",
-        "topix": "TOPIX",
         "dow": "Dow Jones (DIA ETF proxy)",
         "nasdaq": "NASDAQ 100 (QQQ ETF proxy)",
         "sp500": "S&P 500 (SPY ETF proxy)",
@@ -285,9 +270,8 @@ def _fmt_watchlist_en(stocks: list, news_bundle: dict) -> str:
         code = s.get("code", "")
         pct = s.get("change_pct", 0)
         sign = "+" if pct >= 0 else ""
-        mkt = "Tokyo" if s.get("market") == "JP" else "US"
         lines.append(
-            f"- {s.get('name', code)} ({mkt})"
+            f"- {s.get('name', code)} (US)"
             f" close {s.get('close', 'N/A')}, change {sign}{pct:.2f}%"
         )
         earnings = earnings_news.get(code, [])
@@ -313,10 +297,10 @@ def _fallback_script(radio_date: str, market_data: dict, watchlist_data: list, l
     date_str = datetime.strptime(radio_date, "%Y-%m-%d").strftime("%Y年%m月%d日")
     lines = [f"おはようございます。{date_str}の株価ラジオをお届けします。\n"]
 
-    nikkei = market_data.get("nikkei")
-    if nikkei:
-        direction = "上昇" if nikkei.get("change_pct", 0) >= 0 else "下落"
-        lines.append(f"昨日の日経平均は{nikkei.get('close', 'N/A')}円、前日比{direction}でした。\n")
+    sp500 = market_data.get("sp500")
+    if sp500:
+        direction = "上昇" if sp500.get("change_pct", 0) >= 0 else "下落"
+        lines.append(f"昨日の米国市場(S&P500)は{sp500.get('close', 'N/A')}、前日比{direction}でした。\n")
 
     for s in watchlist_data:
         pct = s.get("change_pct", 0)
@@ -331,10 +315,10 @@ def _fallback_script_en(radio_date: str, market_data: dict, watchlist_data: list
     date_str = datetime.strptime(radio_date, "%Y-%m-%d").strftime("%B %d, %Y")
     lines = [f"Good morning. Here is your stock radio for {date_str}.\n"]
 
-    nikkei = market_data.get("nikkei")
-    if nikkei:
-        direction = "up" if nikkei.get("change_pct", 0) >= 0 else "down"
-        lines.append(f"Yesterday, the Nikkei 225 closed at {nikkei.get('close', 'N/A')} yen, {direction} from the previous day.\n")
+    sp500 = market_data.get("sp500")
+    if sp500:
+        direction = "up" if sp500.get("change_pct", 0) >= 0 else "down"
+        lines.append(f"Yesterday, the US market (S&P 500) closed at {sp500.get('close', 'N/A')}, {direction} from the previous day.\n")
 
     for s in watchlist_data:
         pct = s.get("change_pct", 0)

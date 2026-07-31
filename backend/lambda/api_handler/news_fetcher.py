@@ -11,22 +11,6 @@ logger = logging.getLogger()
 
 # NewsAPI の代わりに RSS を使用: 無料・商用OK・レート制限なし
 RSS_FEEDS = [
-    # Japan economy news
-    {
-        "url": "https://www3.nhk.or.jp/rss/news/cat4.xml",
-        "lang": "ja",
-        "category": "jp_economy",
-    },
-    {
-        "url": "https://news.yahoo.co.jp/rss/topics/business.xml",
-        "lang": "ja",
-        "category": "jp_market",
-    },
-    {
-        "url": "http://toyokeizai.net/list/feed/rss",
-        "lang": "ja",
-        "category": "jp_economy",
-    },
     # US / global market news
     {
         "url": "https://feeds.bloomberg.com/markets/news.rss",

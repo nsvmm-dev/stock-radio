@@ -50,7 +50,6 @@ Write-Host "[2/3] Deploying prod stack..." -ForegroundColor Yellow
 
 $llm    = $env_vars['LLM_PROVIDER']
 $tts    = $env_vars['TTS_ENGINE']
-$jq     = $env_vars['JQUANTS_API_KEY']
 $av     = $env_vars['ALPHA_VANTAGE_API_KEY']
 $groq   = $env_vars['GROQ_API_KEY']
 $claude = $env_vars['ANTHROPIC_API_KEY']
@@ -61,7 +60,6 @@ sam deploy --config-env prod `
     "Env=prod" `
     "LlmProvider=$llm" `
     "TtsEngine=$tts" `
-    "JQuantsApiKey=$jq" `
     "AlphaVantageApiKey=$av" `
     "GroqApiKey=$groq" `
     "AnthropicApiKey=$claude" `

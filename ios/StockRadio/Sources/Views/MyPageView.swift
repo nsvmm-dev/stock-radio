@@ -7,12 +7,7 @@ struct MyPageView: View {
     @Environment(\.appTheme) private var theme
     @StateObject private var vm = MyPageViewModel()
     @StateObject private var purchaseService = PurchaseService()
-    @State private var selectedMarket = "US"
     @State private var pendingRadioLanguage: String?
-
-    private var filteredWatchlist: [WatchlistItem] {
-        vm.watchlist.filter { $0.market == selectedMarket }
-    }
 
     var body: some View {
         NavigationStack {
@@ -159,21 +154,15 @@ struct MyPageView: View {
                 }
 
                 Section {
-                    Picker("市場", selection: $selectedMarket) {
-                        Text("米国株").tag("US")
-                        Text("日本株").tag("JP")
-                    }
-                    .pickerStyle(.segmented)
-
                     if vm.isLoading {
                         ProgressView()
                             .frame(maxWidth: .infinity, alignment: .center)
-                    } else if filteredWatchlist.isEmpty {
-                        Text("この市場のお気に入り銘柄はありません")
+                    } else if vm.watchlist.isEmpty {
+                        Text("お気に入り銘柄はありません")
                             .font(.subheadline)
                             .foregroundStyle(theme.secondaryText)
                     } else {
-                        ForEach(filteredWatchlist) { item in
+                        ForEach(vm.watchlist) { item in
                             NavigationLink(value: StockRef(market: item.market, code: item.stockCode, name: item.stockName)) {
                                 WatchlistRowView(item: item) {
                                     Task { await vm.remove(item, userId: appState.userId ?? "") }

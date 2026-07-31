@@ -24,8 +24,6 @@ MAX_SEARCH_RESULTS = 20
 with open(os.path.join(os.path.dirname(__file__), "us_tickers.json"), encoding="utf-8") as f:
     _US_TICKERS = json.load(f)
 
-_jp_stock_master_cache = None  # Lambda実行コンテナ内でのメモリキャッシュ(コールドスタート毎に再取得)
-
 
 def lambda_handler(event, context):
     method = event.get("httpMethod", "GET")
@@ -320,7 +318,7 @@ def _add_watchlist(user_id: str, body: dict):
         "userId": user_id,
         "stockCode": code,
         "stockName": body.get("stockName", code),
-        "market": body.get("market", "JP"),
+        "market": body.get("market", "US"),
         "addedAt": datetime.now(JST).isoformat(),
     }
     watchlist_table.put_item(Item=item)
@@ -341,14 +339,7 @@ def _search_stocks(query: str, market: str):
     if not query:
         return _res(200, {"results": [], "query": query})
 
-    market = market.upper()
-    results = []
-    if market in ("", "US"):
-        results += _search_us_tickers(query)
-    if market in ("", "JP"):
-        results += _search_jp_stock_master(query)
-
-    return _res(200, {"results": results[:MAX_SEARCH_RESULTS], "query": query})
+    return _res(200, {"results": _search_us_tickers(query)[:MAX_SEARCH_RESULTS], "query": query})
 
 
 def _search_us_tickers(query: str) -> list:
@@ -358,34 +349,6 @@ def _search_us_tickers(query: str) -> list:
         if q in t["code"].lower() or q in t["name"].lower()
     ]
     return [{"market": "US", "code": t["code"], "name": t["name"]} for t in matched[:MAX_SEARCH_RESULTS]]
-
-
-def _search_jp_stock_master(query: str) -> list:
-    master = _load_jp_stock_master()
-    q = query.lower()
-    matched = [
-        t for t in master
-        if q in t["code"].lower() or q in t["name"].lower()
-    ]
-    return [{"market": "JP", "code": t["code"], "name": t["name"]} for t in matched[:MAX_SEARCH_RESULTS]]
-
-
-def _load_jp_stock_master() -> list:
-    global _jp_stock_master_cache
-    if _jp_stock_master_cache is not None:
-        return _jp_stock_master_cache
-
-    try:
-        obj = s3.get_object(Bucket=os.environ["AUDIO_BUCKET"], Key="stock-master/jp.json")
-        _jp_stock_master_cache = json.loads(obj["Body"].read())
-    except s3.exceptions.NoSuchKey:
-        logger.warning("銘柄マスタ未生成(日次バッチ未実行)")
-        _jp_stock_master_cache = []
-    except Exception as e:
-        logger.error(f"銘柄マスタ取得エラー: {e}")
-        _jp_stock_master_cache = []
-
-    return _jp_stock_master_cache
 
 
 # ── ニュース ─────────────────────────────────────────────────────────
@@ -411,14 +374,7 @@ def _get_stock_news(market: str, code: str, name: str):
 
 
 def _get_sector(market: str, code: str) -> str:
-    """銘柄の業種を取得。JPはJ-Quantsの17業種区分、USはS&P500静的リストのGICSセクター"""
-    if market == "JP":
-        master = _load_jp_stock_master()
-        item = next((m for m in master if m.get("code") == code), None)
-        sector = item.get("sector", "") if item else ""
-        # 「自動車・輸送機」のような複合区分名はニュース本文に一致しにくいため
-        # 先頭の主要区分のみを検索キーワードとして使う
-        return sector.split("・")[0] if sector else ""
+    """銘柄の業種を取得(S&P500静的リストのGICSセクター)"""
     item = next((t for t in _US_TICKERS if t.get("code") == code), None)
     return item.get("sector", "") if item else ""
 

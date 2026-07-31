@@ -8,10 +8,6 @@
       OR https://platform.openai.com (GPT-4o)
       -> Set in .env.prod: ANTHROPIC_API_KEY or OPENAI_API_KEY
 
-- [ ] J-Quants: Upgrade to paid plan at https://jpx-jquants.com
-      -> Get new API key for paid plan
-      -> Set in .env.prod: JQUANTS_API_KEY
-
 - [ ] Alpha Vantage: Upgrade to Premium at https://www.alphavantage.co/premium
       -> Same API key, just plan upgrade (no key change needed)
       -> Or switch to Polygon.io: https://polygon.io
