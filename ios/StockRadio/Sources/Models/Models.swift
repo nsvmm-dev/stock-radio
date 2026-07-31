@@ -118,9 +118,9 @@ func localized(_ value: String.LocalizationValue) -> String {
 }
 
 extension String {
-    /// "JP"/"US" マーケットコードの表示名(ローカライズ済み)
+    /// マーケットコードの表示名(ローカライズ済み、米国株限定)
     var marketDisplayName: String {
-        self == "JP" ? localized("東証") : localized("米国")
+        localized("米国")
     }
 }
 
