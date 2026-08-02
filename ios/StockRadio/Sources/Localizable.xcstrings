@@ -187,16 +187,6 @@
         }
       }
     },
-    "コードまたは銘柄名 (例: 7203 / トヨタ)": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Code or name (e.g. 7203 / Toyota)"
-          }
-        }
-      }
-    },
     "コードまたは銘柄名 (例: AAPL / Apple)": {
       "localizations": {
         "en": {
@@ -517,16 +507,6 @@
         }
       }
     },
-    "日本株": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Japan Stocks"
-          }
-        }
-      }
-    },
     "日本語": {
       "localizations": {
         "en": {
@@ -573,16 +553,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Not set"
-          }
-        }
-      }
-    },
-    "東証": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tokyo"
           }
         }
       }
