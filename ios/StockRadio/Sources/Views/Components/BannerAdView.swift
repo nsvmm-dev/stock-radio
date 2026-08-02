@@ -3,7 +3,7 @@ import GoogleMobileAds
 
 // Googleが公開しているテスト用広告ユニットID(アカウント不要・常にfill)。
 // 本番運用開始時に実際のAdMobアカウントで発行された広告ユニットIDへ差し替える。
-private let adUnitID = "ca-app-pub-3940256099942544/2435281174"
+private let adUnitID = "ca-app-pub-9133327305052109/1298357492"
 
 struct BannerAdView: UIViewRepresentable {
     func makeUIView(context: Context) -> GADBannerView {

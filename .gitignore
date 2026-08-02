@@ -29,3 +29,6 @@ ios/StockRadio/*.xcodeproj/xcuserdata/
 .vscode/
 .idea/
 *.swp
+
+# Release checklist (delete on release)
+CHECKLIST.md
