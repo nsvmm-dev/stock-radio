@@ -8,7 +8,9 @@ logger = logging.getLogger()
 SCRIPT_SYSTEM_PROMPT = """あなたはプロの株価情報ラジオパーソナリティです。
 以下のルールで台本を作成してください:
 - 自然な話し言葉（です・ます調）
-- 数字は読み上げやすい表現（例: 3万8000円、プラス1.5パーセント）
+- 数字は読み上げやすい表現（例: 160ドル、プラス1.5パーセント）
+- 扱う銘柄はすべて米国株なので、株価には必ず「ドル」を付けて読み上げる
+  （「円」は使わない。例: 「終値は160ドルでした」）
 - 上昇・下落を明確に、かつポジティブに伝える
 - ウォッチリスト銘柄は株価だけで終わらせず、関連ニュースや決算情報が
   あれば必ず触れて内容に厚みを持たせる（決算情報は特に詳しく）
@@ -37,7 +39,9 @@ SCRIPT_PROMPT_TEMPLATE = """【放送日】{date_str}
 SCRIPT_SYSTEM_PROMPT_EN = """You are a professional stock market radio host.
 Follow these rules when writing the script:
 - Natural, conversational spoken English
-- Read numbers in an easy-to-follow way (e.g., "38,000 yen", "up 1.5 percent")
+- Read numbers in an easy-to-follow way (e.g., "160 dollars", "up 1.5 percent")
+- All stocks covered are US stocks, so always state prices in dollars
+  (e.g., "closed at 160 dollars")
 - Clearly and positively convey gains and losses
 - Don't stop at the price for watchlist stocks - always mention related news
   or earnings information when available (go into extra detail for earnings)
@@ -208,7 +212,7 @@ def _fmt_market(data: dict) -> str:
         d = data.get(key)
         if d:
             sign = "+" if d.get("change_pct", 0) >= 0 else ""
-            lines.append(f"{name}: {d.get('close', 'N/A')} ({sign}{d.get('change_pct', 0):.2f}%)")
+            lines.append(f"{name}: {d.get('close', 'N/A')}ドル ({sign}{d.get('change_pct', 0):.2f}%)")
         else:
             lines.append(f"{name}: データなし")
     return "\n".join(lines)
@@ -226,7 +230,7 @@ def _fmt_watchlist(stocks: list, news_bundle: dict) -> str:
         sign = "+" if pct >= 0 else ""
         lines.append(
             f"・{s.get('name', code)}（米国）"
-            f" 終値{s.get('close', 'N/A')} 前日比{sign}{pct:.2f}%"
+            f" 終値{s.get('close', 'N/A')}ドル 前日比{sign}{pct:.2f}%"
         )
         earnings = earnings_news.get(code, [])
         for item in earnings:
@@ -254,7 +258,7 @@ def _fmt_market_en(data: dict) -> str:
         d = data.get(key)
         if d:
             sign = "+" if d.get("change_pct", 0) >= 0 else ""
-            lines.append(f"{name}: {d.get('close', 'N/A')} ({sign}{d.get('change_pct', 0):.2f}%)")
+            lines.append(f"{name}: ${d.get('close', 'N/A')} ({sign}{d.get('change_pct', 0):.2f}%)")
         else:
             lines.append(f"{name}: no data")
     return "\n".join(lines)
@@ -272,7 +276,7 @@ def _fmt_watchlist_en(stocks: list, news_bundle: dict) -> str:
         sign = "+" if pct >= 0 else ""
         lines.append(
             f"- {s.get('name', code)} (US)"
-            f" close {s.get('close', 'N/A')}, change {sign}{pct:.2f}%"
+            f" close ${s.get('close', 'N/A')}, change {sign}{pct:.2f}%"
         )
         earnings = earnings_news.get(code, [])
         for item in earnings:
@@ -300,12 +304,12 @@ def _fallback_script(radio_date: str, market_data: dict, watchlist_data: list, l
     sp500 = market_data.get("sp500")
     if sp500:
         direction = "上昇" if sp500.get("change_pct", 0) >= 0 else "下落"
-        lines.append(f"昨日の米国市場(S&P500)は{sp500.get('close', 'N/A')}、前日比{direction}でした。\n")
+        lines.append(f"昨日の米国市場(S&P500)は{sp500.get('close', 'N/A')}ドル、前日比{direction}でした。\n")
 
     for s in watchlist_data:
         pct = s.get("change_pct", 0)
         direction = "上昇" if pct >= 0 else "下落"
-        lines.append(f"{s.get('name')}は終値{s.get('close', 'N/A')}円、前日比{abs(pct):.1f}%の{direction}でした。")
+        lines.append(f"{s.get('name')}は終値{s.get('close', 'N/A')}ドル、前日比{abs(pct):.1f}%の{direction}でした。")
 
     lines.append("\n以上が本日の株価ラジオでした。良い一日をお過ごしください。")
     return "\n".join(lines)
@@ -318,12 +322,12 @@ def _fallback_script_en(radio_date: str, market_data: dict, watchlist_data: list
     sp500 = market_data.get("sp500")
     if sp500:
         direction = "up" if sp500.get("change_pct", 0) >= 0 else "down"
-        lines.append(f"Yesterday, the US market (S&P 500) closed at {sp500.get('close', 'N/A')}, {direction} from the previous day.\n")
+        lines.append(f"Yesterday, the US market (S&P 500) closed at ${sp500.get('close', 'N/A')}, {direction} from the previous day.\n")
 
     for s in watchlist_data:
         pct = s.get("change_pct", 0)
         direction = "up" if pct >= 0 else "down"
-        lines.append(f"{s.get('name')} closed at {s.get('close', 'N/A')}, {direction} {abs(pct):.1f}% from the previous day.")
+        lines.append(f"{s.get('name')} closed at ${s.get('close', 'N/A')}, {direction} {abs(pct):.1f}% from the previous day.")
 
     lines.append("\nThat's all for today's stock radio. Have a great day.")
     return "\n".join(lines)
