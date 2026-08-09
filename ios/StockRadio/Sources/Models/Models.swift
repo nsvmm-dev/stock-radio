@@ -103,13 +103,21 @@ enum Plan: String, CaseIterable {
 
 let displayLanguageDefaultsKey = "display_language"
 
+/// 初回起動時のデフォルト表示言語を端末のリージョン設定から判定する。
+/// 日本(JP)なら日本語、それ以外(米国含む全世界)は英語をデフォルトにする。
+/// ユーザーはマイページからいつでも手動で切り替え可能で、この判定は
+/// あくまで初期値の推定にすぎない。
+func defaultDisplayLanguage() -> String {
+    Locale.current.region?.identifier == "JP" ? "ja" : "en"
+}
+
 /// マイページの「表示言語」設定に基づいてローカライズ文字列を解決する。
 /// SwiftUI の `.environment(\.locale:)` はビュー階層内の `Text` にしか効かないため、
 /// ViewModel やモデル層で明示的にローカライズする際はこの関数を使う。
 /// `String(localized:locale:)` は Bundle.main の解決に依存し確実に言語を
 /// 切り替えられないケースがあるため、該当言語の .lproj バンドルを明示的に指定する。
 func localized(_ value: String.LocalizationValue) -> String {
-    let language = UserDefaults.standard.string(forKey: displayLanguageDefaultsKey) ?? "ja"
+    let language = UserDefaults.standard.string(forKey: displayLanguageDefaultsKey) ?? defaultDisplayLanguage()
     guard let path = Bundle.main.path(forResource: language, ofType: "lproj"),
           let bundle = Bundle(path: path) else {
         return String(localized: value)

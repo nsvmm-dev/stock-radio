@@ -36,7 +36,7 @@ let uiThemeDefaultsKey = "ui_theme"
 final class AppState: ObservableObject {
     @Published var userId: String?
     @Published var plan: String = "free"
-    @Published var radioLanguage: String = "ja"
+    @Published var radioLanguage: String = defaultDisplayLanguage()
     @Published var displayLanguage: String {
         didSet { UserDefaults.standard.set(displayLanguage, forKey: displayLanguageDefaultsKey) }
     }
@@ -45,12 +45,12 @@ final class AppState: ObservableObject {
     }
 
     init() {
-        displayLanguage = UserDefaults.standard.string(forKey: displayLanguageDefaultsKey) ?? "ja"
+        displayLanguage = UserDefaults.standard.string(forKey: displayLanguageDefaultsKey) ?? defaultDisplayLanguage()
         uiTheme = AppTheme(rawValue: UserDefaults.standard.string(forKey: uiThemeDefaultsKey) ?? "") ?? .standard
         if let user = LocalUser.load() {
             self.userId = user.userId
             self.plan = user.plan
-            self.radioLanguage = user.radioLanguage ?? "ja"
+            self.radioLanguage = user.radioLanguage ?? defaultDisplayLanguage()
         }
     }
 
