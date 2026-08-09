@@ -15,7 +15,10 @@ SCRIPT_SYSTEM_PROMPT = """あなたはプロの株価情報ラジオパーソナ
 - ウォッチリスト銘柄は株価だけで終わらせず、関連ニュースや決算情報が
   あれば必ず触れて内容に厚みを持たせる（決算情報は特に詳しく）
 - 合計 1600〜2400文字（約6〜8分の放送）
-- 台本テキストのみ出力（説明・見出しは不要）"""
+- 台本テキストのみ出力（説明・見出しは不要）
+- 「見る」「ご視聴」など視覚的な表現は使わない。ラジオなので「お聴きいただく」「ご清聴」など聴覚的な表現を使う
+- セクション間の遷移は「続いて」「さて」「それでは」などを使う（「見てみましょう」は不可）
+- 締めのあいさつは必ず「ご清聴ありがとうございました」で締めくくる"""
 
 SCRIPT_PROMPT_TEMPLATE = """【放送日】{date_str}
 
@@ -46,7 +49,10 @@ Follow these rules when writing the script:
 - Don't stop at the price for watchlist stocks - always mention related news
   or earnings information when available (go into extra detail for earnings)
 - Total length: 1200-1800 words (about 6-8 minutes of broadcast)
-- Output only the script text (no explanations or headings)"""
+- Output only the script text (no explanations or headings)
+- Use listening-appropriate language only — never say "watch", "see", or "viewers"; use "listen", "hear", and "listeners"
+- For transitions between sections, use phrases like "moving on", "next up", "now let's turn to"
+- Always close with "Thank you for listening" or "Thanks for tuning in\""""
 
 SCRIPT_PROMPT_TEMPLATE_EN = """[Broadcast date] {date_str}
 
