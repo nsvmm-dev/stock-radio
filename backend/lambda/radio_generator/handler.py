@@ -167,7 +167,7 @@ EARNINGS_KEYWORDS = (
     "earnings", "quarterly results", "revenue", "profit", "guidance", "EPS",
 )
 
-MAX_NEWS_PER_STOCK = 3
+MAX_NEWS_PER_STOCK = 5
 MAX_GENERAL_NEWS = 4
 
 

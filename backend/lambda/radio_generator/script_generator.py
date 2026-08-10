@@ -13,8 +13,9 @@ SCRIPT_SYSTEM_PROMPT = """あなたはプロの株価情報ラジオパーソナ
   （「円」は使わない。例: 「終値は160ドルでした」）
 - 上昇・下落を明確に、かつポジティブに伝える
 - ウォッチリスト銘柄は株価だけで終わらせず、関連ニュースや決算情報が
-  あれば必ず触れて内容に厚みを持たせる（決算情報は特に詳しく）
-- 合計 1600〜2400文字（約6〜8分の放送）
+  あれば必ず触れて内容に厚みを持たせる（決算情報は特に詳しく）。
+  ニュースは見出しの紹介だけで終わらせず、背景や今後への影響にも触れる
+- 合計 2000〜3000文字（約8〜11分の放送）
 - 台本テキストのみ出力（説明・見出しは不要）
 - 「見る」「ご視聴」など視覚的な表現は使わない。ラジオなので「お聴きいただく」「ご清聴」など聴覚的な表現を使う
 - セクション間の遷移は「続いて」「さて」「それでは」などを使う（「見てみましょう」は不可）
@@ -25,7 +26,7 @@ SCRIPT_PROMPT_TEMPLATE = """【放送日】{date_str}
 【台本構成】
 1. 冒頭あいさつ（15秒）
 2. 米国市場の動向と関連ニュース（90秒）
-3. ウォッチリスト銘柄（株価に加え、関連ニュースや決算情報があれば言及。銘柄ごと約40秒）
+3. ウォッチリスト銘柄（株価に加え、関連ニュースや決算情報があれば背景や影響まで踏み込んで言及。銘柄ごと約60秒）
 4. 締めのあいさつ（10秒）
 
 【市場データ】
@@ -47,8 +48,9 @@ Follow these rules when writing the script:
   (e.g., "closed at 160 dollars")
 - Clearly and positively convey gains and losses
 - Don't stop at the price for watchlist stocks - always mention related news
-  or earnings information when available (go into extra detail for earnings)
-- Total length: 1200-1800 words (about 6-8 minutes of broadcast)
+  or earnings information when available (go into extra detail for earnings).
+  Don't just read the headline - touch on the background and likely impact too
+- Total length: 1500-2200 words (about 8-11 minutes of broadcast)
 - Output only the script text (no explanations or headings)
 - Use listening-appropriate language only — never say "watch", "see", or "viewers"; use "listen", "hear", and "listeners"
 - For transitions between sections, use phrases like "moving on", "next up", "now let's turn to"
@@ -59,7 +61,7 @@ SCRIPT_PROMPT_TEMPLATE_EN = """[Broadcast date] {date_str}
 [Script structure]
 1. Opening greeting (15 sec)
 2. US market overview and related news (90 sec)
-3. Watchlist stocks (price plus related news/earnings if available, about 40 sec each)
+3. Watchlist stocks (price plus related news/earnings if available - go beyond the headline into background and impact. About 60 sec each)
 4. Closing greeting (10 sec)
 
 [Market data]
