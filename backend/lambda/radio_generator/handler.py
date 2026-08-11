@@ -19,6 +19,16 @@ JST = timezone(timedelta(hours=9))
 dynamodb = boto3.resource("dynamodb")
 s3 = boto3.client("s3")
 
+# 米国株: S&P500構成銘柄の静的リスト(セクター判定・競合企業ニュース補完に使用)
+with open(os.path.join(os.path.dirname(__file__), "us_tickers.json"), encoding="utf-8") as f:
+    _US_TICKERS = json.load(f)
+
+_SECTOR_BY_CODE = {t["code"]: t.get("sector", "") for t in _US_TICKERS if t.get("code")}
+_TICKERS_BY_SECTOR: dict = {}
+for _t in _US_TICKERS:
+    if _t.get("sector") and _t.get("code"):
+        _TICKERS_BY_SECTOR.setdefault(_t["sector"], []).append(_t)
+
 
 def lambda_handler(event, context):
     jst_now = datetime.now(JST)
@@ -155,6 +165,7 @@ def _fetch_watchlist_data(watchlist: list, stock_fetcher: StockFetcher, date: st
                     "name": item.get("stockName", code),
                     "code": code,
                     "market": "US",
+                    "sector": _SECTOR_BY_CODE.get(code, ""),
                     **data,
                 })
         except Exception as e:
@@ -198,19 +209,42 @@ def _search_name(name: str) -> str:
     return cleaned or name
 
 
+RELATED_NEWS_MIN_DIRECT = 2  # 直接ニュースがこの件数未満の銘柄は業界動向で補完する
+RELATED_NEWS_MAX = 2  # 業界動向として補完する最大件数
+
+
+def _related_keywords(sector: str, exclude_code: str) -> list:
+    """
+    同一セクター内の他銘柄の簡易社名を、競合企業ニュース検索用のキーワードとして返す。
+    件数を絞るとアルファベット順で先頭寄りの企業しか拾えなくなる
+    (Dell/Ciscoのような有名企業が漏れる)ため、セクター内全社を対象にする。
+    ニュース記事数(最大80件程度)との突き合わせなので計算コストは小さい。
+    """
+    peers = _TICKERS_BY_SECTOR.get(sector, [])
+    return [
+        _search_name(p["name"]) for p in peers
+        if p.get("code") != exclude_code and p.get("name")
+    ]
+
+
 def _organize_news(all_news: list, watchlist_data: list) -> dict:
     """
     ウォッチリスト銘柄ごとの関連ニュース(決算関連は別途フラグ)と、
     そこに含まれなかった米国市場の全般ニュースに分類する。
     銘柄名・コードはタイトルと概要の両方から検索し、一致した記事は
     どちらか一方のバケットにのみ入れて重複を避ける。
+    直接ニュースが少ないマイナー銘柄には、同じセクターの競合企業の
+    ニュースを「業界動向」として別バケットで補完する(日本に入って
+    こないような銘柄でも、業界全体の動きとして触れられるようにする)。
     """
     stock_news: dict = {}
     earnings_news: dict = {}
+    related_news: dict = {}
     used_links: set = set()
 
     for stock in watchlist_data:
         code = stock.get("code", "")
+        sector = stock.get("sector", "")
         keywords = [kw for kw in (_search_name(stock.get("name", "")), code) if kw]
         matched = []
         for item in all_news:
@@ -223,19 +257,33 @@ def _organize_news(all_news: list, watchlist_data: list) -> dict:
                 if len(matched) >= MAX_NEWS_PER_STOCK:
                     break
 
-        if not matched:
-            continue
+        if matched:
+            for item in matched:
+                used_links.add(item.get("link", ""))
+            stock_news[code] = matched
 
-        for item in matched:
-            used_links.add(item.get("link", ""))
-        stock_news[code] = matched
+            earnings = [
+                item for item in matched
+                if any(kw in (item.get("title", "") + item.get("summary", "")) for kw in EARNINGS_KEYWORDS)
+            ]
+            if earnings:
+                earnings_news[code] = earnings
 
-        earnings = [
-            item for item in matched
-            if any(kw in (item.get("title", "") + item.get("summary", "")) for kw in EARNINGS_KEYWORDS)
-        ]
-        if earnings:
-            earnings_news[code] = earnings
+        if sector and len(matched) < RELATED_NEWS_MIN_DIRECT:
+            matched_links = {item.get("link", "") for item in matched}
+            peer_keywords = _related_keywords(sector, code)
+            related = []
+            for item in all_news:
+                link = item.get("link", "")
+                if link in used_links or link in matched_links:
+                    continue
+                text = item.get("title", "") + item.get("summary", "")
+                if any(kw in text for kw in peer_keywords):
+                    related.append(item)
+                    if len(related) >= RELATED_NEWS_MAX:
+                        break
+            if related:
+                related_news[code] = related
 
     us_general = []
     for item in all_news:
@@ -247,6 +295,7 @@ def _organize_news(all_news: list, watchlist_data: list) -> dict:
     return {
         "stock_news": stock_news,
         "earnings_news": earnings_news,
+        "related_news": related_news,
         "us_general": us_general[:MAX_GENERAL_NEWS],
     }
 

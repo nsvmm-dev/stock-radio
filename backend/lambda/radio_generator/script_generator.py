@@ -15,6 +15,9 @@ SCRIPT_SYSTEM_PROMPT = """あなたはプロの株価情報ラジオパーソナ
 - ウォッチリスト銘柄は株価だけで終わらせず、関連ニュースや決算情報が
   あれば必ず触れて内容に厚みを持たせる（決算情報は特に詳しく）。
   ニュースは見出しの紹介だけで終わらせず、背景や今後への影響にも触れる
+- 「業界動向」として提示された情報は、その銘柄自身のニュースではなく
+  同業他社・業界全体の話。「業界では」「同業のX社では」のように必ず
+  主語を明確にし、その銘柄自身の話であるかのように断定しない
 - 合計 2000〜3000文字（約8〜11分の放送）
 - 台本テキストのみ出力（説明・見出しは不要）
 - 「見る」「ご視聴」など視覚的な表現は使わない。ラジオなので「お聴きいただく」「ご清聴」など聴覚的な表現を使う
@@ -50,6 +53,10 @@ Follow these rules when writing the script:
 - Don't stop at the price for watchlist stocks - always mention related news
   or earnings information when available (go into extra detail for earnings).
   Don't just read the headline - touch on the background and likely impact too
+- Anything labeled "industry context" is NOT news about that company itself -
+  it's about competitors or the broader industry. Always make the subject
+  clear ("across the industry", "rival company X") - never imply it's about
+  the watchlist company directly
 - Total length: 1500-2200 words (about 8-11 minutes of broadcast)
 - Output only the script text (no explanations or headings)
 - Use listening-appropriate language only — never say "watch", "see", or "viewers"; use "listen", "hear", and "listeners"
@@ -231,6 +238,7 @@ def _fmt_watchlist(stocks: list, news_bundle: dict) -> str:
         return "ウォッチリストに銘柄が登録されていません"
     stock_news = news_bundle.get("stock_news", {})
     earnings_news = news_bundle.get("earnings_news", {})
+    related_news = news_bundle.get("related_news", {})
     lines = []
     for s in stocks:
         code = s.get("code", "")
@@ -246,6 +254,8 @@ def _fmt_watchlist(stocks: list, news_bundle: dict) -> str:
         for item in stock_news.get(code, []):
             if item not in earnings:
                 lines.append(f"  - 関連ニュース: {item.get('title', '')}")
+        for item in related_news.get(code, []):
+            lines.append(f"  - 業界動向(この銘柄自体のニュースではない): {item.get('title', '')}")
     return "\n".join(lines)
 
 
@@ -277,6 +287,7 @@ def _fmt_watchlist_en(stocks: list, news_bundle: dict) -> str:
         return "No stocks in the watchlist"
     stock_news = news_bundle.get("stock_news", {})
     earnings_news = news_bundle.get("earnings_news", {})
+    related_news = news_bundle.get("related_news", {})
     lines = []
     for s in stocks:
         code = s.get("code", "")
@@ -292,6 +303,8 @@ def _fmt_watchlist_en(stocks: list, news_bundle: dict) -> str:
         for item in stock_news.get(code, []):
             if item not in earnings:
                 lines.append(f"  - Related news: {item.get('title', '')}")
+        for item in related_news.get(code, []):
+            lines.append(f"  - Industry context (not about this company itself): {item.get('title', '')}")
     return "\n".join(lines)
 
 
