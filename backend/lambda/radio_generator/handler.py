@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import logging
 from datetime import datetime, timezone, timedelta
 
@@ -171,6 +172,32 @@ MAX_NEWS_PER_STOCK = 5
 MAX_GENERAL_NEWS = 4
 
 
+_COMPANY_SUFFIXES = (
+    ", Inc.", " Inc.", " Incorporated", " Corporation", " Corp.", " Co.",
+    " Ltd.", " plc", " N.V.", " S.A.", " LLC",
+)
+
+
+def _search_name(name: str) -> str:
+    """
+    ニュース本文とのマッチング用に、正式社名から法人格サフィックスや
+    "(Class A)"のような括弧書きを取り除いた簡易名を返す(表示用の
+    正式名称はそのまま別途保持する)。ニュース記事は通常「Apple Inc.」
+    ではなく「Apple」としか書かないため、正式名称そのままだと
+    ほとんど一致しなくなってしまう。
+    """
+    cleaned = re.sub(r"\s*\([^)]*\)\s*$", "", name)
+    changed = True
+    while changed:
+        changed = False
+        for suffix in _COMPANY_SUFFIXES:
+            if cleaned.endswith(suffix):
+                cleaned = cleaned[: -len(suffix)].rstrip(",").strip()
+                changed = True
+    cleaned = cleaned.rstrip(" &,").strip()
+    return cleaned or name
+
+
 def _organize_news(all_news: list, watchlist_data: list) -> dict:
     """
     ウォッチリスト銘柄ごとの関連ニュース(決算関連は別途フラグ)と、
@@ -184,7 +211,7 @@ def _organize_news(all_news: list, watchlist_data: list) -> dict:
 
     for stock in watchlist_data:
         code = stock.get("code", "")
-        keywords = [kw for kw in (stock.get("name", ""), code) if kw]
+        keywords = [kw for kw in (_search_name(stock.get("name", "")), code) if kw]
         matched = []
         for item in all_news:
             link = item.get("link", "")

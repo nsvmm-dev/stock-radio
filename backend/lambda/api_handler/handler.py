@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import logging
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
@@ -353,6 +354,32 @@ def _search_us_tickers(query: str) -> list:
 
 # ── ニュース ─────────────────────────────────────────────────────────
 
+_COMPANY_SUFFIXES = (
+    ", Inc.", " Inc.", " Incorporated", " Corporation", " Corp.", " Co.",
+    " Ltd.", " plc", " N.V.", " S.A.", " LLC",
+)
+
+
+def _search_name(name: str) -> str:
+    """
+    ニュース本文とのマッチング用に、正式社名から法人格サフィックスや
+    "(Class A)"のような括弧書きを取り除いた簡易名を返す(表示用の
+    正式名称はそのまま別途保持する)。ニュース記事は通常「Apple Inc.」
+    ではなく「Apple」としか書かないため、正式名称そのままだと
+    ほとんど一致しなくなってしまう。
+    """
+    cleaned = re.sub(r"\s*\([^)]*\)\s*$", "", name)
+    changed = True
+    while changed:
+        changed = False
+        for suffix in _COMPANY_SUFFIXES:
+            if cleaned.endswith(suffix):
+                cleaned = cleaned[: -len(suffix)].rstrip(",").strip()
+                changed = True
+    cleaned = cleaned.rstrip(" &,").strip()
+    return cleaned or name
+
+
 def _get_stock_news(market: str, code: str, name: str):
     """
     銘柄名/コード/業種セクターでニュースをライブ取得しフィルタ(RSSはレート制限なし)。
@@ -360,7 +387,7 @@ def _get_stock_news(market: str, code: str, name: str):
     業種の関連ニュースも合わせて拾う。タイトルと概要の両方を検索対象にする。
     """
     all_news = NewsFetcher().get_all_news()
-    keywords = {kw for kw in (code, name) if kw}
+    keywords = {kw for kw in (code, _search_name(name)) if kw}
 
     sector = _get_sector(market, code)
     if sector:
