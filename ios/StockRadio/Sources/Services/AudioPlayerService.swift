@@ -2,10 +2,15 @@ import AVFoundation
 import MediaPlayer
 import Combine
 
+private let playbackRateDefaultsKey = "playback_rate"
+
 @MainActor
 final class AudioPlayerService: ObservableObject {
     static let shared = AudioPlayerService()
-    private init() { setupRemoteTransportControls() }
+    private init() {
+        playbackRate = UserDefaults.standard.object(forKey: playbackRateDefaultsKey) as? Float ?? 1.0
+        setupRemoteTransportControls()
+    }
 
     private var player: AVPlayer?
     private var timeObserver: Any?
@@ -13,7 +18,9 @@ final class AudioPlayerService: ObservableObject {
     @Published var isPlaying = false
     @Published var duration: Double = 0
     @Published var currentTime: Double = 0
-    @Published var playbackRate: Float = 1.0
+    @Published var playbackRate: Float {
+        didSet { UserDefaults.standard.set(playbackRate, forKey: playbackRateDefaultsKey) }
+    }
     @Published var currentRadio: RadioMeta?
 
     func play(radio: RadioMeta, audioURL: URL) {
@@ -24,7 +31,6 @@ final class AudioPlayerService: ObservableObject {
 
         let item = AVPlayerItem(url: audioURL)
         player = AVPlayer(playerItem: item)
-        player?.rate = playbackRate
 
         // 再生時間の監視
         timeObserver = player?.addPeriodicTimeObserver(
@@ -46,7 +52,10 @@ final class AudioPlayerService: ObservableObject {
             object: item
         )
 
+        // AVPlayer.play()は内部的にrateを1.0にリセットするため、
+        // 指定速度を反映させるには必ずplay()の後にrateを設定する
         player?.play()
+        player?.rate = playbackRate
         isPlaying = true
         updateNowPlayingInfo(radio: radio)
     }
@@ -58,6 +67,7 @@ final class AudioPlayerService: ObservableObject {
 
     func resume() {
         player?.play()
+        player?.rate = playbackRate
         isPlaying = true
     }
 
