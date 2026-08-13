@@ -16,9 +16,12 @@ struct RadioPlayerView: View {
             Spacer()
 
             // アートワーク
-            Image(systemName: "waveform.circle.fill")
-                .font(.system(size: 120))
-                .foregroundStyle(theme.accent.gradient)
+            Image("RadioImage")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 220, height: 220)
+                .clipShape(RoundedRectangle(cornerRadius: 24))
+                .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 6)
 
             // タイトル
             VStack(spacing: 4) {
