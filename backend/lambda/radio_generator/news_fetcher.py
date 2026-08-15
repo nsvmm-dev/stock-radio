@@ -1,10 +1,16 @@
 import logging
+import os
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import feedparser
+import requests
 
 logger = logging.getLogger()
+
+FINNHUB_BASE = "https://finnhub.io/api/v1"
+MAX_FINNHUB_PER_SYMBOL = 5
 
 # NewsAPI の代わりに RSS を使用: 無料・商用OK・レート制限なし
 RSS_FEEDS = [
@@ -47,6 +53,54 @@ MAX_TOTAL = 80
 
 
 class NewsFetcher:
+    def __init__(self):
+        self._finnhub_key = os.environ.get("FINNHUB_API_KEY", "")
+
+    def get_stocks_news(self, symbols: set, from_date: str, to_date: str) -> dict:
+        """Finnhub から複数銘柄のニュースを一括取得（銘柄コードをキーとする dict）"""
+        if not self._finnhub_key or not symbols:
+            return {}
+        result = {}
+        for i, symbol in enumerate(symbols):
+            if i > 0:
+                time.sleep(1.0)  # 60 req/min 制限
+            news = self._fetch_finnhub_symbol(symbol, from_date, to_date)
+            if news:
+                result[symbol] = news
+        logger.info(f"Finnhub ニュース取得完了: {len(result)}/{len(symbols)} 銘柄")
+        return result
+
+    def _fetch_finnhub_symbol(self, symbol: str, from_date: str, to_date: str) -> list:
+        try:
+            r = requests.get(
+                f"{FINNHUB_BASE}/company-news",
+                params={"symbol": symbol, "from": from_date, "to": to_date, "token": self._finnhub_key},
+                timeout=10,
+            )
+            r.raise_for_status()
+            items = r.json()
+            if not isinstance(items, list):
+                return []
+            result = []
+            for item in items[:MAX_FINNHUB_PER_SYMBOL]:
+                title = item.get("headline", "")
+                if not title:
+                    continue
+                ts = item.get("datetime", 0)
+                pub = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat() if ts else ""
+                result.append({
+                    "title": title,
+                    "summary": item.get("summary", "")[:300],
+                    "link": item.get("url", ""),
+                    "published_at": pub,
+                    "category": "stock_specific",
+                    "source": item.get("source", "Finnhub"),
+                })
+            return result
+        except Exception as e:
+            logger.warning(f"Finnhub news fetch error: symbol={symbol}, {e}")
+            return []
+
     def get_all_news(self) -> list:
         """全RSSフィードからニュースを収集"""
         cutoff = datetime.now(timezone.utc) - timedelta(hours=MAX_NEWS_HOURS)

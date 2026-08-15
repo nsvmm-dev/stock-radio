@@ -52,15 +52,29 @@ def lambda_handler(event, context):
     market_data = _fetch_market_overview(stock_fetcher, fetch_date)
     all_news = news_fetcher.get_all_news()
 
+    # 全ユーザーのウォッチリストを先に取得してユニーク銘柄を収集
+    all_watchlists = {user["userId"]: _get_watchlist(user["userId"]) for user in users}
+    unique_symbols = {
+        item["stockCode"]
+        for wl in all_watchlists.values()
+        for item in wl
+        if item.get("market", "US") == "US"
+    }
+
+    # Finnhub: 銘柄単位でニュース取得（全ユーザー共有・重複APIコールなし）
+    finnhub_from = (jst_now - timedelta(days=3)).strftime("%Y-%m-%d")
+    finnhub_to = jst_now.strftime("%Y-%m-%d")
+    finnhub_news = news_fetcher.get_stocks_news(unique_symbols, finnhub_from, finnhub_to)
+
     generated, failed = 0, 0
 
     for user in users:
         user_id = user["userId"]
-        watchlist = _get_watchlist(user_id)
+        watchlist = all_watchlists[user_id]
         watchlist_data = _fetch_watchlist_data(watchlist, stock_fetcher, fetch_date)
 
         try:
-            _generate_for_user(user, watchlist_data, radio_date, market_data, all_news, jst_now)
+            _generate_for_user(user, watchlist_data, radio_date, market_data, all_news, jst_now, finnhub_news)
             generated += 1
         except Exception as e:
             logger.error(f"ユーザー {user.get('userId')} の生成失敗: {e}", exc_info=True)
@@ -89,7 +103,7 @@ def _fetch_market_overview(stock_fetcher: StockFetcher, fetch_date: str) -> dict
 
 
 def _generate_for_user(user: dict, watchlist_data: list, radio_date: str, market_data: dict,
-                        all_news: list, jst_now: datetime):
+                        all_news: list, jst_now: datetime, finnhub_news: dict = None):
     user_id = user["userId"]
     plan = user.get("plan", "free")
     language = user.get("language", "ja")
@@ -97,7 +111,7 @@ def _generate_for_user(user: dict, watchlist_data: list, radio_date: str, market
         language = "ja"
 
     # ウォッチリスト銘柄ごとの関連ニュース・決算情報、および日米それぞれの市場ニュースに分類
-    news_bundle = _organize_news(all_news, watchlist_data)
+    news_bundle = _organize_news(all_news, watchlist_data, finnhub_news or {})
 
     # 台本生成
     script_gen = ScriptGenerator()
@@ -227,16 +241,16 @@ def _related_keywords(sector: str, exclude_code: str) -> list:
     ]
 
 
-def _organize_news(all_news: list, watchlist_data: list) -> dict:
+def _organize_news(all_news: list, watchlist_data: list, finnhub_news: dict = None) -> dict:
     """
     ウォッチリスト銘柄ごとの関連ニュース(決算関連は別途フラグ)と、
     そこに含まれなかった米国市場の全般ニュースに分類する。
-    銘柄名・コードはタイトルと概要の両方から検索し、一致した記事は
-    どちらか一方のバケットにのみ入れて重複を避ける。
+    Finnhub ニュースが取得できた銘柄はそれを優先使用し、
+    取得できなかった銘柄は RSS からキーワードマッチングで補完する。
     直接ニュースが少ないマイナー銘柄には、同じセクターの競合企業の
-    ニュースを「業界動向」として別バケットで補完する(日本に入って
-    こないような銘柄でも、業界全体の動きとして触れられるようにする)。
+    ニュースを「業界動向」として別バケットで補完する。
     """
+    _finnhub = finnhub_news or {}
     stock_news: dict = {}
     earnings_news: dict = {}
     related_news: dict = {}
@@ -245,23 +259,31 @@ def _organize_news(all_news: list, watchlist_data: list) -> dict:
     for stock in watchlist_data:
         code = stock.get("code", "")
         sector = stock.get("sector", "")
-        keywords = [kw for kw in (_search_name(stock.get("name", "")), code) if kw]
-        matched = []
-        for item in all_news:
-            link = item.get("link", "")
-            if link in used_links:
-                continue
-            text = item.get("title", "") + item.get("summary", "")
-            if any(kw in text for kw in keywords):
-                matched.append(item)
-                if len(matched) >= MAX_NEWS_PER_STOCK:
-                    break
 
-        if matched:
+        if code in _finnhub and _finnhub[code]:
+            # Finnhub ニュースを優先使用（銘柄特化・精度が高い）
+            matched = _finnhub[code]
             for item in matched:
                 used_links.add(item.get("link", ""))
-            stock_news[code] = matched
+        else:
+            # RSS からキーワードマッチング（フォールバック）
+            keywords = [kw for kw in (_search_name(stock.get("name", "")), code) if kw]
+            matched = []
+            for item in all_news:
+                link = item.get("link", "")
+                if link in used_links:
+                    continue
+                text = item.get("title", "") + item.get("summary", "")
+                if any(kw in text for kw in keywords):
+                    matched.append(item)
+                    if len(matched) >= MAX_NEWS_PER_STOCK:
+                        break
+            if matched:
+                for item in matched:
+                    used_links.add(item.get("link", ""))
 
+        if matched:
+            stock_news[code] = matched
             earnings = [
                 item for item in matched
                 if any(kw in (item.get("title", "") + item.get("summary", "")) for kw in EARNINGS_KEYWORDS)
