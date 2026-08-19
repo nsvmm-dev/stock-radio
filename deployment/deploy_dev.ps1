@@ -22,11 +22,13 @@ Get-Content $EnvFile | ForEach-Object {
 $groq = $env_vars['GROQ_API_KEY']
 $av   = $env_vars['ALPHA_VANTAGE_API_KEY']
 $fh   = $env_vars['FINNHUB_API_KEY']
+$ant  = $env_vars['ANTHROPIC_API_KEY']
 
 if (-not $groq -or -not $av -or -not $fh) {
     Write-Host "ERROR: Missing keys in .env (need GROQ_API_KEY, ALPHA_VANTAGE_API_KEY, FINNHUB_API_KEY)" -ForegroundColor Red
     exit 1
 }
+if (-not $ant) { $ant = "skip" }
 
 Write-Host "=== Dev Deploy Start ===" -ForegroundColor Cyan
 
@@ -55,6 +57,7 @@ sam deploy `
     "GroqApiKey=$groq" `
     "AlphaVantageApiKey=$av" `
     "FinnhubApiKey=$fh" `
+    "AnthropicApiKey=$ant" `
   --no-confirm-changeset
 
 Pop-Location

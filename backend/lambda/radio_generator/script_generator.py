@@ -88,9 +88,15 @@ class _LLMBackend(Protocol):
 
 
 class ScriptGenerator:
-    def __init__(self):
+    def __init__(self, plan: str = "free"):
         provider = os.environ.get("LLM_PROVIDER", "groq")
+        # 有料プランは Claude Sonnet を優先使用（APIキーが設定されている場合）
+        if plan in ("standard", "pro"):
+            anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+            if anthropic_key and anthropic_key != "skip":
+                provider = "claude"
         self._backend = _build_backend(provider)
+        self._provider = provider
 
     def generate(self, radio_date: str, market_data: dict,
                  watchlist_data: list, news_bundle: dict, language: str = "ja") -> str:
@@ -98,7 +104,7 @@ class ScriptGenerator:
         prompt = _build_prompt(radio_date, market_data, watchlist_data, news_bundle, language)
         try:
             script = self._backend.generate(prompt, system_prompt)
-            logger.info(f"台本生成完了: {len(script)} 文字")
+            logger.info(f"台本生成完了: {len(script)} 文字 (provider={self._provider})")
             return script
         except Exception as e:
             logger.error(f"台本生成エラー: {e}", exc_info=True)

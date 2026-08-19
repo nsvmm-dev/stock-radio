@@ -113,8 +113,8 @@ def _generate_for_user(user: dict, watchlist_data: list, radio_date: str, market
     # ウォッチリスト銘柄ごとの関連ニュース・決算情報、および日米それぞれの市場ニュースに分類
     news_bundle = _organize_news(all_news, watchlist_data, finnhub_news or {})
 
-    # 台本生成
-    script_gen = ScriptGenerator()
+    # 台本生成（有料プランは Claude Sonnet、無料プランは Groq）
+    script_gen = ScriptGenerator(plan=plan)
     script = script_gen.generate(
         radio_date=radio_date,
         market_data=market_data,
