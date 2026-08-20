@@ -9,8 +9,6 @@ from boto3.dynamodb.conditions import Key, Attr
 
 from stock_fetcher import StockFetcher
 from news_fetcher import NewsFetcher
-from script_generator import ScriptGenerator
-from tts_generator import TTSGenerator
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -18,6 +16,7 @@ logger.setLevel(logging.INFO)
 JST = timezone(timedelta(hours=9))
 dynamodb = boto3.resource("dynamodb")
 s3 = boto3.client("s3")
+sqs = boto3.client("sqs")
 
 # 米国株: S&P500構成銘柄の静的リスト(セクター判定・競合企業ニュース補完に使用)
 with open(os.path.join(os.path.dirname(__file__), "us_tickers.json"), encoding="utf-8") as f:
@@ -66,25 +65,37 @@ def lambda_handler(event, context):
     finnhub_to = jst_now.strftime("%Y-%m-%d")
     finnhub_news = news_fetcher.get_stocks_news(unique_symbols, finnhub_from, finnhub_to)
 
-    generated, failed = 0, 0
+    queue_url = os.environ["WORKER_QUEUE_URL"]
+    sent = 0
 
     for user in users:
         user_id = user["userId"]
         watchlist = all_watchlists[user_id]
         watchlist_data = _fetch_watchlist_data(watchlist, stock_fetcher, fetch_date)
 
-        try:
-            _generate_for_user(user, watchlist_data, radio_date, market_data, all_news, jst_now, finnhub_news)
-            generated += 1
-        except Exception as e:
-            logger.error(f"ユーザー {user.get('userId')} の生成失敗: {e}", exc_info=True)
-            failed += 1
+        # このユーザーの銘柄だけに絞り込んだFinnhubニュースを送信
+        user_symbols = {item["stockCode"] for item in watchlist if item.get("market", "US") == "US"}
+        user_finnhub = {k: v for k, v in finnhub_news.items() if k in user_symbols}
 
-    logger.info(f"生成完了: success={generated}, failed={failed}")
+        message_body = json.dumps({
+            "user": user,
+            "watchlist_data": watchlist_data,
+            "radio_date": radio_date,
+            "market_data": market_data,
+            "all_news": all_news,
+            "finnhub_news": user_finnhub,
+            "jst_now": jst_now.isoformat(),
+        }, default=str)
+
+        sqs.send_message(QueueUrl=queue_url, MessageBody=message_body)
+        sent += 1
+        logger.info(f"SQSキュー送信: userId={user_id}")
+
+    logger.info(f"SQS送信完了: {sent}件")
 
     return {
         "statusCode": 200,
-        "body": json.dumps({"generated": generated, "failed": failed, "date": radio_date}),
+        "body": json.dumps({"queued": sent, "date": radio_date}),
     }
 
 
@@ -100,61 +111,6 @@ def _fetch_market_overview(stock_fetcher: StockFetcher, fetch_date: str) -> dict
     except Exception as e:
         logger.warning(f"市場概況データ取得エラー: {e}")
     return market
-
-
-def _generate_for_user(user: dict, watchlist_data: list, radio_date: str, market_data: dict,
-                        all_news: list, jst_now: datetime, finnhub_news: dict = None):
-    user_id = user["userId"]
-    plan = user.get("plan", "free")
-    language = user.get("language", "ja")
-    if language not in ("ja", "en"):
-        language = "ja"
-
-    # ウォッチリスト銘柄ごとの関連ニュース・決算情報、および日米それぞれの市場ニュースに分類
-    news_bundle = _organize_news(all_news, watchlist_data, finnhub_news or {})
-
-    # 台本生成（有料プランは Claude Sonnet、無料プランは Groq）
-    script_gen = ScriptGenerator(plan=plan)
-    script = script_gen.generate(
-        radio_date=radio_date,
-        market_data=market_data,
-        watchlist_data=watchlist_data,
-        news_bundle=news_bundle,
-        language=language,
-    )
-
-    # 音声生成(free=standard、standard/pro=neuralを自動選択)
-    tts_gen = TTSGenerator(language=language, plan=plan)
-    audio_bytes = tts_gen.synthesize(script)
-
-    # S3 に保存
-    audio_bucket = os.environ["AUDIO_BUCKET"]
-    s3_key = f"radios/{user_id}/{radio_date}.mp3"
-
-    s3.put_object(
-        Bucket=audio_bucket,
-        Key=s3_key,
-        Body=audio_bytes,
-        ContentType="audio/mpeg",
-        Tagging=f"plan={plan}",
-    )
-
-    # DynamoDB にメタ情報保存
-    ttl = _calc_ttl(plan, jst_now)
-    item = {
-        "userId": user_id,
-        "radioDate": radio_date,
-        "s3Key": s3_key,
-        "durationSec": _estimate_duration_sec(script, language),
-        "scriptLength": len(script),
-        "stockCount": len(watchlist_data),
-        "createdAt": jst_now.isoformat(),
-    }
-    if ttl is not None:
-        item["ttl"] = ttl
-
-    dynamodb.Table(os.environ["RADIOS_TABLE"]).put_item(Item=item)
-    logger.info(f"ラジオ保存: userId={user_id}, date={radio_date}, s3={s3_key}")
 
 
 def _calc_ttl(plan: str, now: datetime):

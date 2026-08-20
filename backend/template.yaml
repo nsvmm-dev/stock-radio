@@ -135,21 +135,53 @@ Resources:
         AttributeName: ttl
         Enabled: true
 
+  RadioWorkerQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "stock-radio-worker-${Env}"
+      VisibilityTimeout: 360
+      MessageRetentionPeriod: 3600
+
   RadioGeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "stock-radio-generator-${Env}"
       CodeUri: lambda/radio_generator/
       Handler: handler.lambda_handler
-      Timeout: 900
-      MemorySize: 2048
+      Timeout: 300
+      MemorySize: 1024
+      Environment:
+        Variables:
+          WORKER_QUEUE_URL: !Ref RadioWorkerQueue
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref WatchlistsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt RadioWorkerQueue.Arn
+      Events:
+        RadioGenerationSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: "cron(30 20 * * ? *)"
+            Name: !Sub "stock-radio-generate-${Env}"
+            Description: "Daily radio generation at 5:30 AM JST"
+
+  RadioWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "stock-radio-worker-${Env}"
+      CodeUri: lambda/radio_generator/
+      Handler: worker.lambda_handler
+      Timeout: 300
+      MemorySize: 1024
       Policies:
         - S3FullAccessPolicy:
             BucketName: !Ref AudioBucket
-        - DynamoDBCrudPolicy:
-            TableName: !Ref UsersTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref WatchlistsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref RadiosTable
         - Statement:
@@ -158,13 +190,14 @@ Resources:
                 - polly:SynthesizeSpeech
                 - polly:DescribeVoices
               Resource: "*"
+        - SQSPollerPolicy:
+            QueueName: !GetAtt RadioWorkerQueue.QueueName
       Events:
-        RadioGenerationSchedule:
-          Type: Schedule
+        SQSTrigger:
+          Type: SQS
           Properties:
-            Schedule: "cron(30 20 * * ? *)"
-            Name: !Sub "stock-radio-generate-${Env}"
-            Description: "Daily radio generation at 5:30 AM JST"
+            Queue: !GetAtt RadioWorkerQueue.Arn
+            BatchSize: 1
 
   ApiHandlerFunction:
     Type: AWS::Serverless::Function
