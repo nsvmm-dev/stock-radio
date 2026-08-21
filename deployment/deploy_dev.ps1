@@ -51,9 +51,6 @@ sam deploy `
     "Env=dev" `
     "LlmProvider=groq" `
     "TtsEngine=standard" `
-    "GeminiApiKey=skip" `
-    "AnthropicApiKey=skip" `
-    "OpenAiApiKey=skip" `
     "GroqApiKey=$groq" `
     "AlphaVantageApiKey=$av" `
     "FinnhubApiKey=$fh" `
