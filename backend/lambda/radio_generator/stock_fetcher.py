@@ -26,12 +26,12 @@ class StockFetcher:
         if not self._alpha_key:
             return None
 
-        if symbol in self._us_cache:
-            data = self._us_cache[symbol]
-        else:
-            data = self._fetch_alpha_vantage(symbol)
-            if data:
-                self._us_cache[symbol] = data
+        if symbol not in self._us_cache:
+            # レート制限等で失敗した結果も{}としてキャッシュする。
+            # そうしないと、同じ銘柄を複数ユーザーが持っている場合に
+            # 失敗するたびリトライしてクォータをさらに浪費してしまう。
+            self._us_cache[symbol] = self._fetch_alpha_vantage(symbol) or {}
+        data = self._us_cache[symbol]
 
         if not data:
             return None
