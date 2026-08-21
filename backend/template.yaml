@@ -188,7 +188,6 @@ Resources:
       Handler: worker.lambda_handler
       Timeout: 300
       MemorySize: 1024
-      ReservedConcurrentExecutions: 3
       Policies:
         - S3FullAccessPolicy:
             BucketName: !Ref AudioBucket
@@ -208,6 +207,8 @@ Resources:
           Properties:
             Queue: !GetAtt RadioWorkerQueue.Arn
             BatchSize: 1
+            ScalingConfig:
+              MaximumConcurrency: 3
 
   ApiHandlerFunction:
     Type: AWS::Serverless::Function
