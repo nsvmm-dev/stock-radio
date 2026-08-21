@@ -72,16 +72,22 @@ Resources:
         Rules:
           - Id: DeleteFreeAudio
             Status: Enabled
-            ExpirationInDays: 3
+            ExpirationInDays: 1
             TagFilters:
               - Key: plan
                 Value: free
           - Id: DeleteStandardAudio
             Status: Enabled
-            ExpirationInDays: 32
+            ExpirationInDays: 3
             TagFilters:
               - Key: plan
                 Value: standard
+          - Id: DeleteProAudio
+            Status: Enabled
+            ExpirationInDays: 7
+            TagFilters:
+              - Key: plan
+                Value: pro
           - Id: DeleteSharedContext
             Status: Enabled
             Prefix: "shared/"

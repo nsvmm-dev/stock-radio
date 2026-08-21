@@ -269,13 +269,26 @@ def _get_radio(user_id: str, radio_date: str):
         return _res(404, {"error": "radio not found"})
 
     item = result["Item"]
-    # S3 presigned URL を発行（直接ダウンロードではなくURL返却）
+    bucket = os.environ["AUDIO_BUCKET"]
+    s3_key = item["s3Key"]
     try:
         item["audioUrl"] = s3.generate_presigned_url(
             "get_object",
-            Params={"Bucket": os.environ["AUDIO_BUCKET"], "Key": item["s3Key"]},
+            Params={"Bucket": bucket, "Key": s3_key},
             ExpiresIn=AUDIO_URL_EXPIRE_SEC,
         )
+        # Pro ユーザーにはダウンロード URL を追加（iOS 側でオフライン保存に使用）
+        user_result = dynamodb.Table(os.environ["USERS_TABLE"]).get_item(Key={"userId": user_id})
+        if user_result.get("Item", {}).get("plan") == "pro":
+            item["downloadUrl"] = s3.generate_presigned_url(
+                "get_object",
+                Params={
+                    "Bucket": bucket,
+                    "Key": s3_key,
+                    "ResponseContentDisposition": f'attachment; filename="radio-{radio_date}.mp3"',
+                },
+                ExpiresIn=AUDIO_URL_EXPIRE_SEC,
+            )
     except Exception as e:
         logger.error(f"presigned URL 生成失敗: {e}")
 

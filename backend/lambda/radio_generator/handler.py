@@ -124,12 +124,12 @@ def _fetch_market_overview(stock_fetcher: StockFetcher, fetch_date: str) -> dict
     return market
 
 
+RADIO_RETENTION_DAYS = {"free": 1, "standard": 3, "pro": 7}
+
+
 def _calc_ttl(plan: str, now: datetime):
-    if plan == "free":
-        return int((now + timedelta(days=2)).timestamp())
-    elif plan == "standard":
-        return int((now + timedelta(days=31)).timestamp())
-    return None  # pro = 無制限
+    days = RADIO_RETENTION_DAYS.get(plan, 1)
+    return int((now + timedelta(days=days)).timestamp())
 
 
 def _fetch_watchlist_data(watchlist: list, stock_fetcher: StockFetcher, date: str) -> list:
