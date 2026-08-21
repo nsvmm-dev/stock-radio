@@ -65,6 +65,18 @@ def lambda_handler(event, context):
     finnhub_to = jst_now.strftime("%Y-%m-%d")
     finnhub_news = news_fetcher.get_stocks_news(unique_symbols, finnhub_from, finnhub_to)
 
+    # 共有コンテキスト(market_data + all_news)をS3に一時保存
+    # → SQSメッセージに全ユーザー分埋め込む256KB制限を回避
+    audio_bucket = os.environ["AUDIO_BUCKET"]
+    context_s3_key = f"shared/{radio_date}/context.json"
+    s3.put_object(
+        Bucket=audio_bucket,
+        Key=context_s3_key,
+        Body=json.dumps({"market_data": market_data, "all_news": all_news}, default=str).encode("utf-8"),
+        ContentType="application/json",
+    )
+    logger.info(f"共有コンテキスト保存: {context_s3_key}")
+
     queue_url = os.environ["WORKER_QUEUE_URL"]
     sent = 0
 
@@ -81,8 +93,7 @@ def lambda_handler(event, context):
             "user": user,
             "watchlist_data": watchlist_data,
             "radio_date": radio_date,
-            "market_data": market_data,
-            "all_news": all_news,
+            "context_s3_key": context_s3_key,
             "finnhub_news": user_finnhub,
             "jst_now": jst_now.isoformat(),
         }, default=str)

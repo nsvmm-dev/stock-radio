@@ -45,6 +45,7 @@ Globals:
     Runtime: python3.11
     Timeout: 30
     MemorySize: 512
+    Tracing: Active
     Environment:
       Variables:
         ENV: !Ref Env
@@ -87,6 +88,10 @@ Resources:
             TagFilters:
               - Key: plan
                 Value: standard
+          - Id: DeleteSharedContext
+            Status: Enabled
+            Prefix: "shared/"
+            ExpirationInDays: 3
 
   UsersTable:
     Type: AWS::DynamoDB::Table
@@ -163,6 +168,10 @@ Resources:
               Action:
                 - sqs:SendMessage
               Resource: !GetAtt RadioWorkerQueue.Arn
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub "arn:aws:s3:::${AudioBucket}/shared/*"
       Events:
         RadioGenerationSchedule:
           Type: Schedule
@@ -179,6 +188,7 @@ Resources:
       Handler: worker.lambda_handler
       Timeout: 300
       MemorySize: 1024
+      ReservedConcurrentExecutions: 3
       Policies:
         - S3FullAccessPolicy:
             BucketName: !Ref AudioBucket

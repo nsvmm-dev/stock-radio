@@ -31,10 +31,16 @@ def _process_user(message: dict):
     user = message["user"]
     watchlist_data = message["watchlist_data"]
     radio_date = message["radio_date"]
-    market_data = message["market_data"]
-    all_news = message["all_news"]
     finnhub_news = message.get("finnhub_news", {})
     jst_now = datetime.fromisoformat(message["jst_now"])
+
+    # 共有コンテキスト(market_data + all_news)をS3から取得
+    audio_bucket = os.environ["AUDIO_BUCKET"]
+    context_s3_key = message["context_s3_key"]
+    resp = s3.get_object(Bucket=audio_bucket, Key=context_s3_key)
+    context = json.loads(resp["Body"].read())
+    market_data = context["market_data"]
+    all_news = context["all_news"]
 
     user_id = user["userId"]
     plan = user.get("plan", "free")
