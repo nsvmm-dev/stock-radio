@@ -55,6 +55,7 @@ sam deploy `
     "AlphaVantageApiKey=$av" `
     "FinnhubApiKey=$fh" `
     "AnthropicApiKey=$ant" `
+    "AlertEmail=naka.kn007@gmail.com" `
   --no-confirm-changeset
 
 Pop-Location

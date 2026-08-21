@@ -31,6 +31,10 @@ Parameters:
     Type: String
     NoEcho: true
     Default: ""
+  AlertEmail:
+    Type: String
+    Default: ""
+    Description: "CloudWatch alarm notification email"
 
 Globals:
   Function:
@@ -278,6 +282,99 @@ Resources:
             Schedule: "cron(0 21 * * ? *)"
             Name: !Sub "stock-radio-cleanup-${Env}"
             Description: "Cleanup expired files at 6:00 AM JST"
+
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "stock-radio-alerts-${Env}"
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlertEmail
+
+  CoordinatorErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "stock-radio-coordinator-errors-${Env}"
+      AlarmDescription: "Coordinator Lambda had errors - radio generation may have failed"
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref RadioGeneratorFunction
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Statistic: Sum
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  WorkerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "stock-radio-worker-errors-${Env}"
+      AlarmDescription: "Worker Lambda had 3+ errors in 1 hour - multiple users affected"
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref RadioWorkerFunction
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Statistic: Sum
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  NotificationErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "stock-radio-notification-errors-${Env}"
+      AlarmDescription: "Notification Lambda had errors - push notifications may not have been sent"
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref NotificationFunction
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Statistic: Sum
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  MonthlyCostBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub "stock-radio-monthly-${Env}"
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: 10
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
 
 Outputs:
   ApiGatewayUrl:
